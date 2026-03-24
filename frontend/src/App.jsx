@@ -1,12 +1,28 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-
-import FinancialDashboard from "./components/FinancialDashboard.jsx"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./components/Layout";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Inversiones from "./pages/Inversiones";
+import AnalisisFinanciero from "./pages/AnalisisFinanciero";
+import Tarjetas from "./pages/Tarjetas";
+import MetasAhorro from "./pages/MetasAhorro";
 
 function App() {
-  return <FinancialDashboard />
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/login" element={<Login />} />
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/inversiones" element={<Inversiones />} />
+          <Route path="/analisis" element={<AnalisisFinanciero />} />
+          <Route path="/tarjetas" element={<Tarjetas />} />
+          <Route path="/metas" element={<MetasAhorro />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
