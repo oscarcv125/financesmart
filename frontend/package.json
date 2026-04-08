@@ -10,15 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-=======
-    "axios": "^1.13.6",
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.102.1",
+    "axios": "^1.15.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.1",
->>>>>>> 8677fe2 (Cambios QOL)
     "recharts": "^3.7.0"
   },
   "devDependencies": {
