@@ -66,8 +66,6 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
-<<<<<<< HEAD
-=======
 
 
 html, body, #root {
@@ -79,4 +77,13 @@ html, body, #root {
   background: #f4f5f7;
 }
 
->>>>>>> 8677fe2 (Cambios QOL)
+.nav-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+  color: #666;
+  transition: all 0.15s;
+}
+.nav-item.active .nav-icon {
+  opacity: 1;
+  color: #cc0000;
+}
