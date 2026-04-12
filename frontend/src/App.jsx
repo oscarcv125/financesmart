@@ -6,12 +6,14 @@ import Inversiones from "./pages/Inversiones";
 import AnalisisFinanciero from "./pages/AnalisisFinanciero";
 import Tarjetas from "./pages/Tarjetas";
 import MetasAhorro from "./pages/MetasAhorro";
+import Register from "./pages/Register";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
