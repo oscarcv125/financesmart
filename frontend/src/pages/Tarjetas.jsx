@@ -1,96 +1,5 @@
 import { useState } from "react";
-import Sidebar from "../components/Sidebar";
-
-
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  .app-layout {
-    display: flex; height: 100vh; width: 100vw;
-    overflow: hidden; font-family: 'DM Sans', sans-serif;
-    position: fixed; top: 0; left: 0;
-    padding-top: 56px; padding-left: 180px;
-  }
-  .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .page-body {
-    flex: 1; overflow-y: auto;
-    padding: 24px 28px;
-    background: #f4f5f7;
-    display: flex; flex-direction: column; gap: 24px;
-  }
-
-  .page-breadcrumb { font-size: 13px; color: #888; }
-  .page-breadcrumb strong { color: #333; font-weight: 600; }
-
-  .section-title {
-    font-size: 16px; font-weight: 700; color: #222;
-    margin-bottom: 12px;
-  }
-
-  .items-list {
-    display: flex; flex-direction: column; gap: 10px;
-  }
-
-  .item-card {
-    background: #fff; border-radius: 14px;
-    padding: 18px 22px;
-    display: flex; align-items: center; gap: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    border: 1px solid #ebebeb;
-    cursor: pointer;
-    transition: box-shadow 0.15s, transform 0.15s;
-  }
-  .item-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-1px); }
-  .item-card.active { border-color: #cc0000; box-shadow: 0 0 0 2px rgba(204,0,0,0.15); }
-
-  .item-logo {
-    width: 48px; height: 48px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-weight: 700; font-size: 13px;
-    color: #fff; letter-spacing: 0.5px;
-  }
-  .logo-debito  { background: linear-gradient(135deg, #cc0000, #880000); }
-  .logo-credito { background: linear-gradient(135deg, #1a1a2e, #16213e); }
-  .logo-ahorro  { background: linear-gradient(135deg, #1b5e20, #2e7d32); }
-
-  .item-info { flex: 1; }
-  .item-name { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 3px; }
-  .item-numero { font-size: 12px; color: #aaa; }
-
-  .item-right { text-align: right; }
-  .item-saldo-label { font-size: 11px; color: #aaa; margin-bottom: 2px; }
-  .item-saldo-value { font-size: 16px; font-weight: 700; color: #111; }
-
-  /* Historial */
-  .historial-card {
-    background: #fff; border-radius: 12px;
-    overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  }
-  .historial-header {
-    padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .historial-title { font-size: 15px; font-weight: 700; color: #222; }
-  .historial-tag {
-    font-size: 11px; font-weight: 600; padding: 4px 10px;
-    border-radius: 20px; background: #fff0f0; color: #cc0000;
-  }
-  .mov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .mov-table thead tr { background: #f8f8f8; }
-  .mov-table th { padding: 11px 18px; text-align: left; font-weight: 600; color: #666; font-size: 12px; }
-  .mov-table td { padding: 13px 18px; border-bottom: 1px solid #f0f0f0; color: #333; }
-  .mov-table tr:last-child td { border-bottom: none; }
-  .mov-table tr:hover td { background: #fafafa; }
-  .badge-gasto   { color: #e53935; font-weight: 600; }
-  .badge-ingreso { color: #43a047; font-weight: 600; }
-  .categoria-pill {
-    display: inline-block; padding: 3px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 500; background: #f0f0f0; color: #555;
-  }
-  .monto-neg { color: #e53935; font-weight: 600; }
-  .monto-pos { color: #43a047; font-weight: 600; }
-`;
+import "../styles/tarjetas.css";
 
 const cuentas = [
   { id: 3, nombre: "Cuenta de Ahorro Banorte", numero: "**** **** **** 7754", saldo: 15320.00, logoClass: "logo-ahorro", tipo: "Ahorro",  label: "Saldo" },
@@ -132,9 +41,7 @@ export default function Tarjetas() {
 
   return (
     <>
-      <style>{styles}</style>
       <div className="app-layout">
-        <Sidebar />
         <div className="main-content">
           <main className="page-body">
 
