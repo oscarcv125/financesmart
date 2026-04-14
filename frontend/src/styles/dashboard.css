@@ -183,3 +183,22 @@
 
 .badge-gasto   { color: #EB0029; font-weight: 500; }
 .badge-ingreso { color: #6CC04A; font-weight: 500; }
+
+.breadcrumb-select {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #666; /* Cambiado de dashed a solid */
+  color: #333;
+  font-weight: bold;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  margin-left: 5px;
+  outline: none;
+  padding-bottom: 2px;
+}
+
+.breadcrumb-select:hover {
+  color: #000;
+  border-bottom-style: solid;
+}

@@ -1,22 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../styles/inversiones.css";
 
-
-const inversiones = [
-  { nombre: "Fondo de Inversión", roi: 6.20,  plazo: 90,  riesgo: "Bajo"  },
-  { nombre: "Mercado Global",     roi: 12.20, plazo: 90,  riesgo: "Alto"  },
-  { nombre: "Pagaré",             roi: 16.20, plazo: 190, riesgo: "Bajo"  },
-  { nombre: "CETES 28 días",      roi: 11.30, plazo: 28,  riesgo: "Bajo"  },
-  { nombre: "Fibra Inmobiliaria", roi: 9.50,  plazo: 365, riesgo: "Medio" },
-];
-
 export default function Inversiones() {
+  const [inversiones, setInversiones] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [sortDir, setSortDir] = useState("asc");
   const [dropOpen, setDropOpen] = useState(false);
+
+  useEffect(() => {
+    fetch("http://localhost:3001/api/inversion/lista")
+      .then((response) => response.json())
+      .then((data) => {
+        setInversiones(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error al cargar inversiones:", err);
+        setLoading(false);
+      });
+  }, []);
 
   const sorted = [...inversiones].sort((a, b) =>
     sortDir === "asc" ? a.roi - b.roi : b.roi - a.roi
   );
+
+  if (loading) return <div className="page-body">Cargando datos financieros...</div>;
+  
+  //En caso de fallar
+  if (!inversiones || inversiones.length === 0) return (
+    <div className="page-body">
+      <div className="page-header">
+        <div className="page-welcome">Bienvenido</div>
+      </div>
+      <p>No se pudieron cargar los datos. Contacta a un administrador.</p>
+    </div>
+  );
+
 
   return (
     <>
