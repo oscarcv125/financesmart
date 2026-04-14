@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseserver');
 
-const ID_USUARIO = 1; 
 
 //Obtener las metas
 router.get('/', async (req, res) => {
@@ -10,7 +9,7 @@ router.get('/', async (req, res) => {
     const { data, error } = await supabase
       .from('ahorro_meta') 
       .select('*')
-      .eq('id_usuario', ID_USUARIO)
+      .eq('id_usuario', req.usuario.id_usuario)
       .order('id_meta', { ascending: true });
 
     if (error) throw error;
@@ -31,7 +30,7 @@ router.post('/', async (req, res) => {
         monto_objetivo: parseFloat(meta), 
         progreso: 0, 
         fecha_limite: fecha, 
-        id_usuario: ID_USUARIO 
+        id_usuario: req.usuario.id_usuario
       }])
       .select();
 
@@ -77,7 +76,7 @@ router.patch('/:id/aportar', async (req, res) => {
     const { error: movError } = await supabase
       .from('movimiento_financiero')
       .insert([{
-        id_usuario: 1, // ID de usuario estático CAMBIAR
+        id_usuario: req.usuario.id_usuario,
         id_tarjeta: id_tarjeta,
         id_categoria: 29, 
         monto: -montoAporte,

@@ -1,16 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../utils/supabaseserver'); 
+const { supabase } = require('../utils/supabaseserver');
 
 router.get('/', async (req, res) => {
   try {
-    const id_usuario = 1; 
+    const id_usuario = req.usuario.id_usuario;
     const { tarjetaId } = req.query;
 
-    //Datos del usuario
-    const userQuery = supabase.from("usuario").select("*").eq("id_usuario", id_usuario).maybeSingle();
-    
-    //Movimientos filtrables
     let movsQuery = supabase
       .from("movimiento_financiero")
       .select("*, categoria(nombre)")
@@ -21,14 +17,11 @@ router.get('/', async (req, res) => {
       movsQuery = movsQuery.eq("id_tarjeta", tarjetaId);
     }
 
-    const [userRes, movsRes] = await Promise.all([userQuery, movsQuery]);
-
-    if (userRes.error) throw userRes.error;
+    const movsRes = await movsQuery;
     if (movsRes.error) throw movsRes.error;
 
     const movimientos = movsRes.data || [];
 
-    //Totales
     const ingresos = movimientos
       .filter(m => m.tipo === "Ingreso")
       .reduce((acc, m) => acc + Number(m.monto), 0);
@@ -38,7 +31,7 @@ router.get('/', async (req, res) => {
       .reduce((acc, m) => acc + Math.abs(Number(m.monto)), 0);
 
     res.json({
-      nombreUsuario: userRes.data ? `${userRes.data.nombre} ${userRes.data.apellido}` : "Usuario",
+      nombreUsuario: `${req.usuario.nombre} ${req.usuario.apellido}`,
       totales: { ingresos, gastos, saldo: ingresos - gastos },
       movimientos,
       tarjetaSeleccionada: tarjetaId || "Global"

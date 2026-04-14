@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import "../styles/inversiones.css";
 
 export default function Inversiones() {
+  const { session } = useAuth();
   const [inversiones, setInversiones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortDir, setSortDir] = useState("asc");
   const [dropOpen, setDropOpen] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:3001/api/inversion/lista")
+    if (!session) return;
+    fetch("http://localhost:3001/api/inversion/lista", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
       .then((response) => response.json())
       .then((data) => {
         setInversiones(data);
@@ -18,7 +23,7 @@ export default function Inversiones() {
         console.error("Error al cargar inversiones:", err);
         setLoading(false);
       });
-  }, []);
+  }, [session]);
 
   const sorted = [...inversiones].sort((a, b) =>
     sortDir === "asc" ? a.roi - b.roi : b.roi - a.roi

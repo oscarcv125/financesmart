@@ -1,40 +1,42 @@
 import "../styles/dashboard.css";
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const { session } = useAuth();
   const [data, setData] = useState(null);
-  const [tarjetas, setTarjetas] = useState([]); 
+  const [tarjetas, setTarjetas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tarjetaActiva, setTarjetaActiva] = useState(localStorage.getItem("tarjeta_preferida") || "");
 
-  // 1. Cargar la lista de tarjetas
   useEffect(() => {
-    fetch("http://localhost:3001/api/tarjetas/")
+    if (!session) return;
+    fetch("http://localhost:3001/api/tarjetas/", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
       .then(res => res.json())
-      .then(json => setTarjetas(json))
+      .then(json => setTarjetas(Array.isArray(json) ? json : []))
       .catch(err => console.error("Error cargando tarjetas:", err));
-  }, []);
+  }, [session]);
 
-  // 2. Cargar los datos del dashboard dinamico
   useEffect(() => {
+    if (!session) return;
     setLoading(true);
-    const url = tarjetaActiva 
-      ? `http://localhost:3001/api/dashboard?tarjetaId=${tarjetaActiva}` 
+    const url = tarjetaActiva
+      ? `http://localhost:3001/api/dashboard?tarjetaId=${tarjetaActiva}`
       : "http://localhost:3001/api/dashboard";
 
-    fetch(url)
+    fetch(url, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
       .then((res) => res.json())
       .then((json) => {
         if (!json.error) setData(json);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Error de conexión:", err);
-        setLoading(false);
-      });
-  }, [tarjetaActiva]);
+      .catch(() => setLoading(false));
+  }, [tarjetaActiva, session]);
 
-  // 3. Manejar el cambio en el selector de tarjetas
   const handleChangeTarjeta = (e) => {
     const id = e.target.value;
     setTarjetaActiva(id);
@@ -53,10 +55,10 @@ export default function Dashboard() {
       <div className="page-header">
         <div className="page-welcome">Bienvenido, {data.nombreUsuario}</div>
         <div className="page-breadcrumb">
-          Dashboard › 
-          <select 
-            className="breadcrumb-select" 
-            value={tarjetaActiva} 
+          Dashboard ›
+          <select
+            className="breadcrumb-select"
+            value={tarjetaActiva}
             onChange={handleChangeTarjeta}
           >
             <option value="">Vista General (Global)</option>

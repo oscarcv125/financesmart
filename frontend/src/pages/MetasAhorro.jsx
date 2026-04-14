@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { TbPlus, TbCalendar, TbPigMoney, TbTrash, TbX } from "react-icons/tb";
+import { useAuth } from "../context/AuthContext";
 import "../styles/metasahorro.css";
 
-const API_URL = "http://localhost:3001/api/metas/"; 
+const API_URL = "http://localhost:3001/api/metas/";
 const colorPorPct = (p) => p >= 80 ? "#6CC04A" : p >= 50 ? "#FFA400" : "#EB0029";
 
 export default function MetasAhorro() {
+  const { session } = useAuth();
   const [metas, setMetas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -15,7 +17,9 @@ export default function MetasAhorro() {
 
   const cargarMetas = async () => {
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(API_URL, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       const rawData = await res.json();
       const dataMapeada = rawData.map(m => ({
         id: m.id_meta,           
@@ -34,8 +38,8 @@ export default function MetasAhorro() {
   };
 
   useEffect(() => {
-    cargarMetas();
-  }, []);
+    if (session) cargarMetas();
+  }, [session]);
 
   const totalMeta = metas.reduce((s, m) => s + (Number(m.meta) || 0), 0);
   const totalActual = metas.reduce((s, m) => s + (Number(m.actual) || 0), 0);
@@ -44,13 +48,13 @@ export default function MetasAhorro() {
 
   const agregarMeta = async () => {
   if (!form.nombre || !form.meta) return;
-  
+
   const fechaCompleta = form.fecha ? `${form.fecha}-01` : null;
 
   try {
     const res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({
         nombre: form.nombre,
         meta: form.meta,
@@ -86,7 +90,7 @@ export default function MetasAhorro() {
     try {
       const res = await fetch(`${API_URL}${aportarId}/aportar`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ 
           monto: val,
           id_tarjeta: tarjetaGlobalId 
@@ -109,7 +113,7 @@ export default function MetasAhorro() {
   const eliminarMeta = async (id) => {
     if (!window.confirm("¿Eliminar esta meta?")) return;
     try {
-      const res = await fetch(`${API_URL}${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${session.access_token}` } });
       if (res.ok) cargarMetas();
     } catch (err) { console.error("Error al eliminar:", err); }
   };
