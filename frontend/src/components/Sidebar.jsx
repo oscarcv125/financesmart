@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../utils/supabaseclient";
 import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import { MdDashboard, MdSavings } from "react-icons/md";
 import { RiStockLine } from "react-icons/ri";
@@ -18,7 +19,8 @@ export default function Sidebar() {
     { icon: MdSavings,         label: "Metas de Ahorro",     path: "/metas"       },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/login");
   };
 

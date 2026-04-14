@@ -1,16 +1,26 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../utils/supabaseclient";
 import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import "../styles/login.css";
-
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (email && password) navigate("/dashboard");
+  const handleLogin = async () => {
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   return (
@@ -49,12 +59,14 @@ export default function Login() {
               </div>
             </div>
 
+            {error && <p className="field-error">{error}</p>}
+
             <button
               className="login-btn"
               onClick={handleLogin}
-              disabled={!email || !password}
+              disabled={!email || !password || loading}
             >
-              Continuar
+              {loading ? "Cargando..." : "Continuar"}
             </button>
 
             <p className="login-footer">

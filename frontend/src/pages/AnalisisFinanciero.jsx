@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import "../styles/analisisfinanciero.css";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -9,13 +10,17 @@ const TABS = ["Mensual", "Trimestral", "Anual"];
 const PIE_COLORS = ["#EB0029", "#ff6f00", "#fdd835", "#43a047", "#1976d2", "#8e24aa"];
 
 export default function AnalisisFinanciero() {
+  const { session } = useAuth();
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState("Mensual");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!session) return;
     setLoading(true);
-    fetch(`http://localhost:3001/api/analisis/resumen?periodo=${activeTab}`)
+    fetch(`http://localhost:3001/api/analisis/resumen?periodo=${activeTab}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
       .then(res => res.json())
       .then(json => {
         setData(json);
@@ -25,7 +30,7 @@ export default function AnalisisFinanciero() {
         console.error("Error al cargar análisis:", err);
         setLoading(false);
       });
-  }, [activeTab]); // cambio de pestaña
+  }, [activeTab, session]);
 
   if (loading) return <div className="page-body">Actualizando reporte...</div>;
   if (!data || data.gastosDiarios.length === 0) return (

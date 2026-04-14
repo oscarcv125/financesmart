@@ -4,7 +4,7 @@ const { supabase } = require('../utils/supabaseserver');
 
 router.get('/resumen', async (req, res) => {
   try {
-    const id_usuario = 1;
+    const id_usuario = req.usuario.id_usuario;
     const { periodo } = req.query; // 'Mensual', 'Trimestral', 'Anual'
 
     //Calculo de fechas

@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseserver');
 
-const ID_USUARIO = 1;
 
 // Obtener tarjetas
 router.get('/', async (req, res) => {
@@ -21,7 +20,7 @@ router.get('/', async (req, res) => {
           categoria (nombre)
         )
       `)
-      .eq('id_usuario', ID_USUARIO);
+      .eq('id_usuario', req.usuario.id_usuario);
 
     if (error) throw error;
     res.json(data);

@@ -1,19 +1,24 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import "../styles/tarjetas.css";
 
 const API_TARJETAS = "http://localhost:3001/api/tarjetas/";
 const API_DASHBOARD = "http://localhost:3001/api/dashboard/";
 
 export default function Tarjetas() {
+  const { session } = useAuth();
   const [tarjetas, setTarjetas] = useState([]);
   const [resumen, setResumen] = useState(null);
   const [activo, setActivo] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!session) return;
     const inicializar = async () => {
       try {
-        const res = await fetch(API_TARJETAS);
+        const res = await fetch(API_TARJETAS, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
         const data = await res.json();
         
         const procesadas = data.map(t => ({
@@ -34,11 +39,14 @@ export default function Tarjetas() {
       }
     };
     inicializar();
-  }, []);
+  }, [session]);
 
   const cargarSoloResumen = async (idTarjeta) => {
+    if (!session) return;
     const url = idTarjeta ? `${API_DASHBOARD}?tarjetaId=${idTarjeta}` : API_DASHBOARD;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
     const data = await res.json();
     setResumen(data);
   };

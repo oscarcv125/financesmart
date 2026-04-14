@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../utils/supabaseclient";
 import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import "../styles/register.css";
 
@@ -13,17 +14,31 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const isFormValid = nombre && apellido && email && password && confirm;
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!isFormValid) return;
     if (password !== confirm) {
       setError("Las contraseñas no coinciden.");
       return;
     }
+    setLoading(true);
     setError("");
-    navigate("/dashboard");
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { nombre, apellido, telefono: tel, perfil },
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   return (
@@ -126,9 +141,9 @@ export default function Register() {
             <button
               className="login-btn"
               onClick={handleRegister}
-              disabled={!isFormValid}
+              disabled={!isFormValid || loading}
             >
-              Crear cuenta
+              {loading ? "Creando cuenta..." : "Crear cuenta"}
             </button>
 
             <p className="login-footer">
