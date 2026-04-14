@@ -1,141 +1,96 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../styles/tarjetas.css";
 
-const cuentas = [
-  { id: 3, nombre: "Cuenta de Ahorro Banorte", numero: "**** **** **** 7754", saldo: 15320.00, logoClass: "logo-ahorro", tipo: "Ahorro",  label: "Saldo" },
-];
-
-const tarjetas = [
-  { id: 1, nombre: "Tarjeta de Débito Banorte",  numero: "**** **** **** 4821", saldo: 1240.68,  logoClass: "logo-debito",  tipo: "Débito",  label: "Saldo" },
-  { id: 2, nombre: "Tarjeta de Crédito Banorte", numero: "**** **** **** 3390", saldo: 8500.00,  logoClass: "logo-credito", tipo: "Crédito", label: "Crédito disponible" },
-];
-
-const historial = {
-  1: [
-    { fecha: "26/02", descripcion: "Uber Eats",    categoria: "Comida",        tipo: "Gasto",   monto: -199.00  },
-    { fecha: "26/02", descripcion: "OXXO Tec",     categoria: "Tienda",        tipo: "Gasto",   monto: -56.00   },
-    { fecha: "26/02", descripcion: "Spotify",      categoria: "Suscripción",   tipo: "Gasto",   monto: -199.00  },
-    { fecha: "19/02", descripcion: "Retiro ATM",   categoria: "Efectivo",      tipo: "Gasto",   monto: -500.00  },
-    { fecha: "15/02", descripcion: "Transferencia",categoria: "Transferencia", tipo: "Ingreso", monto: +600.00  },
-    { fecha: "05/02", descripcion: "Nómina",       categoria: "Ingreso",       tipo: "Ingreso", monto: +5000.00 },
-  ],
-  2: [
-    { fecha: "25/02", descripcion: "Liverpool",    categoria: "Ropa",          tipo: "Gasto",   monto: -1200.00 },
-    { fecha: "22/02", descripcion: "Netflix",      categoria: "Suscripción",   tipo: "Gasto",   monto: -149.00  },
-    { fecha: "18/02", descripcion: "Gasolina",     categoria: "Transporte",    tipo: "Gasto",   monto: -600.00  },
-    { fecha: "10/02", descripcion: "Amazon",       categoria: "Compras",       tipo: "Gasto",   monto: -349.00  },
-  ],
-  3: [
-    { fecha: "01/02", descripcion: "Depósito",     categoria: "Ahorro",        tipo: "Ingreso", monto: +2000.00 },
-    { fecha: "01/01", descripcion: "Depósito",     categoria: "Ahorro",        tipo: "Ingreso", monto: +2000.00 },
-    { fecha: "01/12", descripcion: "Depósito",     categoria: "Ahorro",        tipo: "Ingreso", monto: +1500.00 },
-  ],
-};
-
-const todos = [...cuentas, ...tarjetas];
+const API_TARJETAS = "http://localhost:3001/api/tarjetas/";
+const API_DASHBOARD = "http://localhost:3001/api/dashboard/";
 
 export default function Tarjetas() {
-  const [activo, setActivo] = useState(3);
-  const itemActivo = todos.find(t => t.id === activo);
-  const movimientos = historial[activo] || [];
+  const [tarjetas, setTarjetas] = useState([]);
+  const [resumen, setResumen] = useState(null);
+  const [activo, setActivo] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const inicializar = async () => {
+      try {
+        const res = await fetch(API_TARJETAS);
+        const data = await res.json();
+        
+        const procesadas = data.map(t => ({
+          id: t.id_tarjeta,
+          nombre: t.nombre,
+          numero: "**** " + t.id_tarjeta,
+          tipo: t.tipo,
+          logoClass: t.tipo === "Crédito" ? "logo-credito" : "logo-debito",
+          saldo: t.movimiento_financiero.reduce((acc, m) => acc + Number(m.monto), 0)
+        }));
+
+        setTarjetas(procesadas);
+        cargarSoloResumen(null);
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+      }
+    };
+    inicializar();
+  }, []);
+
+  const cargarSoloResumen = async (idTarjeta) => {
+    const url = idTarjeta ? `${API_DASHBOARD}?tarjetaId=${idTarjeta}` : API_DASHBOARD;
+    const res = await fetch(url);
+    const data = await res.json();
+    setResumen(data);
+  };
+
+  const manejarSeleccion = (id) => {
+    const nuevoActivo = activo === id ? null : id;
+    setActivo(nuevoActivo);
+    
+    //Sincronizacion con Dashboard
+    if (nuevoActivo) localStorage.setItem("tarjeta_preferida", nuevoActivo);
+    else localStorage.removeItem("tarjeta_preferida");
+    
+    cargarSoloResumen(nuevoActivo);
+  };
+
+  if (loading) return <div className="page-body">Cargando cuentas...</div>;
 
   return (
-    <>
-      <div className="app-layout">
-        <div className="main-content">
-          <main className="page-body">
+    <main className="page-body">
+      <div className="page-breadcrumb">Cuentas y Tarjetas › <strong>Mis Cuentas</strong></div>
 
-            <div className="page-breadcrumb">
-              Cuentas y Tarjetas › <strong>Mis cuentas</strong>
+      <div className="items-list">
+        {tarjetas.map(t => (
+          <div key={t.id} className={`item-card ${activo === t.id ? "active" : ""}`} onClick={() => manejarSeleccion(t.id)}>
+            <div className={`item-logo ${t.logoClass}`}>BN</div>
+            <div className="item-info">
+              <div className="item-name">{t.nombre}</div>
+              <div className="item-numero">{t.numero}</div>
             </div>
-
-            {/* Cuentas */}
-            <div>
-              <div className="section-title">Cuentas</div>
-              <div className="items-list">
-                {cuentas.map(c => (
-                  <div
-                    key={c.id}
-                    className={`item-card ${activo === c.id ? "active" : ""}`}
-                    onClick={() => setActivo(c.id)}
-                  >
-                    <div className={`item-logo ${c.logoClass}`}>BN</div>
-                    <div className="item-info">
-                      <div className="item-name">{c.nombre}</div>
-                      <div className="item-numero">{c.numero}</div>
-                    </div>
-                    <div className="item-right">
-                      <div className="item-saldo-label">{c.label}</div>
-                      <div className="item-saldo-value">
-                        ${c.saldo.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="item-right">
+              <div className="item-saldo-label">Saldo Actual</div>
+              <div className="item-saldo-value">${Math.abs(t.saldo).toLocaleString()}</div>
             </div>
-
-            {/* Tarjetas */}
-            <div>
-              <div className="section-title">Tarjetas</div>
-              <div className="items-list">
-                {tarjetas.map(t => (
-                  <div
-                    key={t.id}
-                    className={`item-card ${activo === t.id ? "active" : ""}`}
-                    onClick={() => setActivo(t.id)}
-                  >
-                    <div className={`item-logo ${t.logoClass}`}>BN</div>
-                    <div className="item-info">
-                      <div className="item-name">{t.nombre}</div>
-                      <div className="item-numero">{t.numero}</div>
-                    </div>
-                    <div className="item-right">
-                      <div className="item-saldo-label">{t.label}</div>
-                      <div className="item-saldo-value">
-                        ${t.saldo.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Historial */}
-            <div className="historial-card">
-              <div className="historial-header">
-                <span className="historial-title">Historial de movimientos</span>
-                <span className="historial-tag">{itemActivo.tipo} · {itemActivo.numero}</span>
-              </div>
-              <table className="mov-table">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Descripción</th>
-                    <th>Categoría</th>
-                    <th>Tipo</th>
-                    <th>Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movimientos.map((mov, i) => (
-                    <tr key={i}>
-                      <td>{mov.fecha}</td>
-                      <td>{mov.descripcion}</td>
-                      <td><span className="categoria-pill">{mov.categoria}</span></td>
-                      <td className={mov.tipo === "Gasto" ? "badge-gasto" : "badge-ingreso"}>{mov.tipo}</td>
-                      <td className={mov.monto < 0 ? "monto-neg" : "monto-pos"}>
-                        {mov.monto < 0 ? "-" : "+"}${Math.abs(mov.monto).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-          </main>
-        </div>
+          </div>
+        ))}
       </div>
-    </>
+
+      {resumen && (
+        <div className="resumen-container" style={{ marginTop: '20px' }}>
+          <div className="section-title">Resumen de {activo ? 'Cuenta' : 'Efectivo Total'}</div>
+          <div className="resumen-row" style={{ display: 'flex', gap: '15px' }}>
+            <div className="resumen-card">
+              <div className="resumen-label">Ingresos Totales</div>
+              <div className="resumen-value" style={{ color: '#6CC04A' }}>+${resumen.totales.ingresos.toLocaleString()}</div>
+            </div>
+            <div className="resumen-card">
+              <div className="resumen-label">Gastos Totales</div>
+              <div className="resumen-value" style={{ color: '#EB0029' }}>-${resumen.totales.gastos.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

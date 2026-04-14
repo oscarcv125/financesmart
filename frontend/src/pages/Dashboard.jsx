@@ -3,118 +3,122 @@ import { useState, useEffect } from "react";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [tarjetas, setTarjetas] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [tarjetaActiva, setTarjetaActiva] = useState(localStorage.getItem("tarjeta_preferida") || "");
 
+  // 1. Cargar la lista de tarjetas
   useEffect(() => {
-    fetch("http://localhost:3001/api/dashboard/resumen")
+    fetch("http://localhost:3001/api/tarjetas/")
+      .then(res => res.json())
+      .then(json => setTarjetas(json))
+      .catch(err => console.error("Error cargando tarjetas:", err));
+  }, []);
+
+  // 2. Cargar los datos del dashboard dinamico
+  useEffect(() => {
+    setLoading(true);
+    const url = tarjetaActiva 
+      ? `http://localhost:3001/api/dashboard?tarjetaId=${tarjetaActiva}` 
+      : "http://localhost:3001/api/dashboard";
+
+    fetch(url)
       .then((res) => res.json())
       .then((json) => {
-        // Si el backend mandó un error, se maneja para no romper el render
-        if (json.error) {
-          console.error("Error del backend:", json.error);
-          setData(null);
-        } else {
-          setData(json);
-        }
+        if (!json.error) setData(json);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Error al conectar con el backend:", err);
+        console.error("Error de conexión:", err);
         setLoading(false);
       });
-  }, []);
+  }, [tarjetaActiva]);
 
-  if (loading) return <div className="page-body">Cargando datos financieros...</div>;
-  
-  //Si el backend falló, mostramos un estado amigable
-  if (!data) return (
-    <div className="page-body">
-      <div className="page-header">
-        <div className="page-welcome">Bienvenido</div>
-      </div>
-      <p>No se pudieron cargar los datos. Contacta a un administrador.</p>
-    </div>
-  );
+  // 3. Manejar el cambio en el selector de tarjetas
+  const handleChangeTarjeta = (e) => {
+    const id = e.target.value;
+    setTarjetaActiva(id);
+    if (id) {
+      localStorage.setItem("tarjeta_preferida", id);
+    } else {
+      localStorage.removeItem("tarjeta_preferida");
+    }
+  };
+
+  if (loading && !data) return <div className="page-body">Cargando datos financieros...</div>;
+  if (!data) return <div className="page-body">Error al cargar datos.</div>;
 
   return (
     <main className="page-body">
       <div className="page-header">
-        <div className="page-welcome">Bienvenido, {data?.nombreUsuario || "Usuario"}</div>
-        <div className="page-breadcrumb">Dashboard</div>
+        <div className="page-welcome">Bienvenido, {data.nombreUsuario}</div>
+        <div className="page-breadcrumb">
+          Dashboard › 
+          <select 
+            className="breadcrumb-select" 
+            value={tarjetaActiva} 
+            onChange={handleChangeTarjeta}
+          >
+            <option value="">Vista General (Global)</option>
+            {tarjetas.map(t => (
+              <option key={t.id_tarjeta} value={t.id_tarjeta}>
+                {t.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="cards-row-3">
         <div className="stat-card">
-          <div className="stat-card-label">Saldo Disponible</div>
+          <div className="stat-card-label">Saldo Neto</div>
           <div className="stat-card-value">
-            {/* El ?. asegura que si totales no existe, no se caiga la app */}
-            ${(data?.totales?.saldo || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+            ${(data.totales?.saldo || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
           </div>
-          <div className="stat-card-sub">
-            <span className="dot" style={{ background: "#FFA400" }} />
-            Saldo en MXN
-          </div>
+          <div className="stat-card-sub"><span className="dot" style={{ background: "#FFA400" }} /> MXN</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Ingresos del mes</div>
+          <div className="stat-card-label">Ingresos</div>
           <div className="stat-card-value green">
-            ${(data?.totales?.ingresos || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+            +${(data.totales?.ingresos || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
           </div>
-          <div className="stat-card-sub">
-            <span className="dot" style={{ background: "#6CC04A" }} />
-            Total de entradas
-          </div>
+          <div className="stat-card-sub"><span className="dot" style={{ background: "#6CC04A" }} /> Entradas</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Gastado este mes</div>
+          <div className="stat-card-label">Gastos</div>
           <div className="stat-card-value red">
-            ${(data?.totales?.gastos || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+            -${(data.totales?.gastos || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
           </div>
-          <div className="stat-card-sub">
-            <span className="dot" style={{ background: "#EB0029" }} />
-            Total de salidas
-          </div>
+          <div className="stat-card-sub"><span className="dot" style={{ background: "#EB0029" }} /> Salidas</div>
         </div>
       </div>
 
-      <div>
-        <div className="section-title">Movimientos</div>
-        <div className="movimientos-card">
-          <table className="mov-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Descripción</th>
-                <th>Tipo</th>
-                <th>Monto</th>
+      <div className="section-title">Movimientos Recientes</div>
+      <div className="movimientos-card">
+        <table className="mov-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Descripción</th>
+              <th>Categoría</th>
+              <th>Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.movimientos.map((mov, i) => (
+              <tr key={i}>
+                <td>{new Date(mov.fecha).toLocaleDateString()}</td>
+                <td>{mov.descripcion}</td>
+                <td><span className="categoria-pill">{mov.categoria?.nombre || 'General'}</span></td>
+                <td className={mov.tipo === "Gasto" ? "monto-neg" : "monto-pos"}>
+                  {mov.tipo === "Gasto" ? "-" : "+"}${Math.abs(mov.monto).toFixed(2)}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {/* Verificar un array antes de hacer .map */}
-              {(data?.movimientos || []).map((mov, i) => (
-                <tr key={i}>
-                  <td>{mov.fecha ? new Date(mov.fecha).toLocaleDateString("es-MX", { timeZone: 'UTC' }) : "---"}</td>
-                  <td>{mov.descripcion}</td>
-                  <td className={mov.tipo === "Gasto" ? "badge-gasto" : "badge-ingreso"}>
-                    {mov.tipo}
-                  </td>
-                  <td>
-                    ${Number(mov.monto || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              ))}
-              {(!data?.movimientos || data.movimientos.length === 0) && (
-                <tr>
-                  <td colSpan="4" style={{ textAlign: "center", padding: "20px" }}>
-                    No se encontraron movimientos.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     </main>
   );

@@ -2,50 +2,50 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseserver'); 
 
-router.get('/resumen', async (req, res) => {
-
+router.get('/', async (req, res) => {
   try {
-    // ID de prueba 
     const id_usuario = 1; 
-    console.log(`Buscando datos para el ID_USUARIO: ${id_usuario}`);
+    const { tarjetaId } = req.query;
 
-    const [userRes, movsRes] = await Promise.all([
-      supabase.from("usuario").select("*").eq("id_usuario", id_usuario).maybeSingle(),
-      supabase.from("movimiento_financiero").select("*").eq("id_usuario", id_usuario).order("fecha", { ascending: false })
-    ]);
+    //Datos del usuario
+    const userQuery = supabase.from("usuario").select("*").eq("id_usuario", id_usuario).maybeSingle();
+    
+    //Movimientos filtrables
+    let movsQuery = supabase
+      .from("movimiento_financiero")
+      .select("*, categoria(nombre)")
+      .eq("id_usuario", id_usuario)
+      .order("fecha", { ascending: false });
 
-    // Verificación de errores
-    if (userRes.error) console.error("Error Supabase (Usuario):", userRes.error.message);
-    if (movsRes.error) console.error("Error Supabase (Movimientos):", movsRes.error.message);
+    if (tarjetaId && tarjetaId !== 'null' && tarjetaId !== 'undefined') {
+      movsQuery = movsQuery.eq("id_tarjeta", tarjetaId);
+    }
 
-    const usuario = userRes.data;
+    const [userRes, movsRes] = await Promise.all([userQuery, movsQuery]);
+
+    if (userRes.error) throw userRes.error;
+    if (movsRes.error) throw movsRes.error;
+
     const movimientos = movsRes.data || [];
 
-    const ingresosArr = movimientos.filter(m => m.tipo === "Ingreso");
-    const gastosArr = movimientos.filter(m => m.tipo === "Gasto");
+    //Totales
+    const ingresos = movimientos
+      .filter(m => m.tipo === "Ingreso")
+      .reduce((acc, m) => acc + Number(m.monto), 0);
 
-    const ingresos = ingresosArr.reduce((acc, m) => acc + Number(m.monto), 0);
-    const gastos = gastosArr.reduce((acc, m) => acc + Number(m.monto), 0);
+    const gastos = movimientos
+      .filter(m => m.tipo === "Gasto")
+      .reduce((acc, m) => acc + Math.abs(Number(m.monto)), 0);
 
-    //JSON para el frontend
-    const respuestaFinal = {
-      nombreUsuario: usuario ? `${usuario.nombre} ${usuario.apellido}` : "Usuario",
-      totales: {
-        ingresos,
-        gastos,
-        saldo: ingresos - gastos
-      },
-      movimientos
-    };
-    
-    res.json(respuestaFinal);
+    res.json({
+      nombreUsuario: userRes.data ? `${userRes.data.nombre} ${userRes.data.apellido}` : "Usuario",
+      totales: { ingresos, gastos, saldo: ingresos - gastos },
+      movimientos,
+      tarjetaSeleccionada: tarjetaId || "Global"
+    });
 
   } catch (error) {
-    console.error("ERROR EN EL BACKEND:", error.message);
-    res.status(500).json({ 
-      error: "Error interno del servidor", 
-      detalle: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
