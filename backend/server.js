@@ -15,6 +15,10 @@ app.use(express.json());
 
 app.use('/api/finanzas', authMiddleware, finanzasRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
+app.get('/api/me', authMiddleware, (req, res) => {
+  const { nombre, apellido, email } = req.usuario;
+  res.json({ nombre, apellido, email });
+});
 app.use('/api/inversion', authMiddleware, inversionRoutes);
 app.use('/api/analisis', authMiddleware, analisisRoutes);
 app.use('/api/metas', authMiddleware, metasRoutes);

@@ -114,8 +114,8 @@ export default function Dashboard() {
                 <td>{new Date(mov.fecha).toLocaleDateString()}</td>
                 <td>{mov.descripcion}</td>
                 <td><span className="categoria-pill">{mov.categoria?.nombre || 'General'}</span></td>
-                <td className={mov.tipo === "Gasto" ? "monto-neg" : "monto-pos"}>
-                  {mov.tipo === "Gasto" ? "-" : "+"}${Math.abs(mov.monto).toFixed(2)}
+                <td className={mov.tipo?.toLowerCase() === "gasto" ? "monto-neg" : "monto-pos"}>
+                  {mov.tipo?.toLowerCase() === "gasto" ? "-" : "+"}${Math.abs(mov.monto).toFixed(2)}
                 </td>
               </tr>
             ))}

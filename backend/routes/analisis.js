@@ -45,7 +45,7 @@ router.get('/resumen', async (req, res) => {
         flujoAgrupado[etiqueta] = { label: etiqueta, gasto: 0, ingreso: 0, fechaRef: m.fecha };
       }
       
-      if (m.tipo === 'Gasto') flujoAgrupado[etiqueta].gasto += Number(m.monto);
+      if (m.tipo?.toLowerCase() === 'gasto') flujoAgrupado[etiqueta].gasto += Number(m.monto);
       else flujoAgrupado[etiqueta].ingreso += Number(m.monto);
     });
 
@@ -53,7 +53,7 @@ router.get('/resumen', async (req, res) => {
 
     //Proceso de datos para Gráfica de Pie
     const catAgrupadas = {};
-    movimientos.filter(m => m.tipo === 'Gasto').forEach(m => {
+    movimientos.filter(m => m.tipo?.toLowerCase() === 'gasto').forEach(m => {
       const nombreCat = m.categoria?.nombre || 'Otros';
       catAgrupadas[nombreCat] = (catAgrupadas[nombreCat] || 0) + Number(m.monto);
     });
@@ -64,7 +64,7 @@ router.get('/resumen', async (req, res) => {
 
     //Tendencia Mensual
     const tendenciaAgrupada = {};
-    movimientos.filter(m => m.tipo === 'Gasto').forEach(m => {
+    movimientos.filter(m => m.tipo?.toLowerCase() === 'gasto').forEach(m => {
       const mesNombre = mesesNombres[parseInt(m.fecha.split('-')[1]) - 1];
       if (!tendenciaAgrupada[mesNombre]) {
         tendenciaAgrupada[mesNombre] = { mes: mesNombre, gasto: 0, mesNum: parseInt(m.fecha.split('-')[1]) };
