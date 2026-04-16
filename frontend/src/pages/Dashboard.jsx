@@ -1,6 +1,7 @@
 import "../styles/dashboard.css";
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import PageLoader from "../components/Skeleton";
 
 export default function Dashboard() {
   const { session } = useAuth();
@@ -11,7 +12,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!session) return;
-    fetch("http://localhost:3001/api/tarjetas/", {
+    fetch("/api/tarjetas/", {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(res => res.json())
@@ -23,8 +24,8 @@ export default function Dashboard() {
     if (!session) return;
     setLoading(true);
     const url = tarjetaActiva
-      ? `http://localhost:3001/api/dashboard?tarjetaId=${tarjetaActiva}`
-      : "http://localhost:3001/api/dashboard";
+      ? `/api/dashboard?tarjetaId=${tarjetaActiva}`
+      : "/api/dashboard";
 
     fetch(url, {
       headers: { Authorization: `Bearer ${session.access_token}` },
@@ -47,7 +48,7 @@ export default function Dashboard() {
     }
   };
 
-  if (loading && !data) return <div className="page-body">Cargando datos financieros...</div>;
+  if (loading && !data) return <PageLoader />;
   if (!data) return <div className="page-body">Error al cargar datos.</div>;
 
   return (

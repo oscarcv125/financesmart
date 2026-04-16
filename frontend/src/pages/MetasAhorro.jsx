@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { TbPlus, TbCalendar, TbPigMoney, TbTrash, TbX } from "react-icons/tb";
+import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import PageLoader from "../components/Skeleton";
 import "../styles/metasahorro.css";
 
-const API_URL = "http://localhost:3001/api/metas/";
+const API_URL = "/api/metas/";
 const colorPorPct = (p) => p >= 80 ? "#6CC04A" : p >= 50 ? "#FFA400" : "#EB0029";
 
 export default function MetasAhorro() {
@@ -83,7 +85,7 @@ export default function MetasAhorro() {
     const tarjetaGlobalId = localStorage.getItem("tarjeta_preferida");
 
     if (!tarjetaGlobalId) {
-      alert("No tienes una tarjeta seleccionada. Ve al Dashboard y selecciona una cuenta para poder realizar el cobro del ahorro.");
+      toast.error("Selecciona una tarjeta en el Dashboard antes de realizar un aporte.");
       return;
     }
 
@@ -103,7 +105,7 @@ export default function MetasAhorro() {
         setAporte("");
       } else {
         const errorData = await res.json();
-        alert(errorData.error);
+        toast.error(errorData.error || "Error al realizar el aporte");
       }
     } catch (err) { 
       console.error("Error al aportar:", err); 
@@ -118,7 +120,7 @@ export default function MetasAhorro() {
     } catch (err) { console.error("Error al eliminar:", err); }
   };
 
-  if (loading) return <main className="page-body">Cargando metas...</main>;
+  if (loading) return <PageLoader />;
 
   return (
     <>
