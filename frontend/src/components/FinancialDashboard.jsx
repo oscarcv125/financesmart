@@ -22,7 +22,7 @@ export default function FinancialDashboard() {
 
   useEffect(() => {
     axios
-      .get(`http://localhost:3001/api/finanzas/${activeTab.toLowerCase()}`)
+      .get(`/api/finanzas/${activeTab.toLowerCase()}`)
       .then((res) => {
         setBarData(res.data.barras);
         setPieData(res.data.pay);

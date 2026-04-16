@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import PageLoader from "../components/Skeleton";
 import "../styles/analisisfinanciero.css";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -18,7 +19,7 @@ export default function AnalisisFinanciero() {
   useEffect(() => {
     if (!session) return;
     setLoading(true);
-    fetch(`http://localhost:3001/api/analisis/resumen?periodo=${activeTab}`, {
+    fetch(`/api/analisis/resumen?periodo=${activeTab}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(res => res.json())
@@ -32,7 +33,7 @@ export default function AnalisisFinanciero() {
       });
   }, [activeTab, session]);
 
-  if (loading) return <div className="page-body">Actualizando reporte...</div>;
+  if (loading) return <PageLoader />;
   if (!data || data.gastosDiarios.length === 0) return (
     <div className="page-body">
       <div className="tabs">
@@ -113,10 +114,21 @@ export default function AnalisisFinanciero() {
         </ResponsiveContainer>
       </div>
 
-      <div className="tip-banner">
-        <span>💡</span>
-        <p>Tu consumo se está desviando un poco en comidas de snack como son los cafés del Andatti.</p>
-      </div>
+      {(() => {
+        const totalGastos = data.categorias.reduce((s, c) => s + c.value, 0);
+        const top = data.categorias.reduce((a, b) => a.value > b.value ? a : b, data.categorias[0]);
+        if (!top || totalGastos === 0) return null;
+        const pct = Math.round((top.value / totalGastos) * 100);
+        const tip = pct >= 40
+          ? `Tu mayor gasto es en ${top.name} con $${top.value.toLocaleString()} (${pct}% del total). Considera revisar esta categoría.`
+          : `Tus finanzas se ven equilibradas. Tu mayor categoría es ${top.name} con $${top.value.toLocaleString()} (${pct}%).`;
+        return (
+          <div className="tip-banner">
+            <span>💡</span>
+            <p>{tip}</p>
+          </div>
+        );
+      })()}
     </main>
   );
 }

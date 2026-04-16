@@ -1,89 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
+import ReactMarkdown from "react-markdown";
 import "../styles/chatbot.css";
-
-const GEMINI_API_KEY = "AIzaSyAg1MnGuuu2Syzw4jfDVJQAY4xdx0UCoR0";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-const DATOS_FINANCIEROS = `
-=== PERFIL DEL USUARIO ===
-Nombre: Oscar Cardenas
-Banco: Banorte
-
-=== DASHBOARD - ESTADO ACTUAL (Febrero 2026) ===
-- Saldo disponible: $1,240.68 MXN
-- Gastado este mes: $3,760.00 MXN
-- Comparado al mes anterior: 22% más de gasto ↗
-- Días restantes del mes: 18
-
-=== MOVIMIENTOS DE FEBRERO 2026 ===
-| Fecha  | Descripción    | Tipo    | Monto      |
-|--------|----------------|---------|------------|
-| 26/02  | Uber Eats      | Gasto   | $199.00    |
-| 26/02  | OXXO Tec       | Gasto   | $56.00     |
-| 26/02  | Spotify        | Gasto   | $199.00    |
-| 19/02  | Retiro         | Gasto   | $500.00    |
-| 15/02  | Transferencia  | Ingreso | $600.00    |
-| 10/02  | Netflix        | Gasto   | $149.00    |
-| 05/02  | Nómina         | Ingreso | $5,000.00  |
-
-Total ingresos febrero: $5,600.00
-Total gastos febrero: $3,760.00
-
-=== ANÁLISIS FINANCIERO MENSUAL ===
-- Enero: $3,200 en gastos
-- Febrero: $5,800 en gastos
-- Marzo: $4,500 en gastos
-
-Distribución de gastos:
-- Inversión: 35%
-- Snacks/Cafés (ej. Andatti): 25%
-- Ocio: 40%
-
-Alerta activa: El consumo en snacks y cafés (como Andatti) se está desviando del presupuesto habitual.
-
-=== OPORTUNIDADES DE INVERSIÓN DISPONIBLES ===
-1. Fondo de Inversión  — ROI: 6.20%  — Plazo: 90 días  — Riesgo: Bajo
-2. Mercado Global      — ROI: 12.20% — Plazo: 90 días  — Riesgo: Alto
-3. Pagaré              — ROI: 16.20% — Plazo: 190 días — Riesgo: Bajo
-4. CETES 28 días       — ROI: 11.30% — Plazo: 28 días  — Riesgo: Bajo
-5. Fibra Inmobiliaria  — ROI: 9.50%  — Plazo: 365 días — Riesgo: Medio
-`;
-
-const buildPromptCoach = (nombre) => `
-Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario ${nombre} en Banorte.
-Responde SIEMPRE en español, de forma motivadora, cercana y con iniciativa.
-Tu objetivo es ayudar a ${nombre.split(' ')[0]} a mejorar sus finanzas activamente.
-
-TU ROL COMO COACH:
-- Propón metas de ahorro concretas basadas en sus datos.
-- Si gasta mucho en una categoría, sugiérele cómo reducirlo con pasos específicos.
-- Recomienda inversiones según su perfil y saldo disponible.
-- Celebra sus logros financieros y motívalo cuando veas que va bien.
-- Dale tips prácticos y accionables, no solo información.
-- Si pregunta algo general, aprovecha para darle un consejo útil relacionado.
-- Puedes calcular proyecciones si te lo piden.
-- No inventes datos que no estén en el contexto.
-
-${DATOS_FINANCIEROS}
-`;
-
-const buildPromptAnalyst = (nombre) => `
-Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario ${nombre} en Banorte.
-Responde SIEMPRE en español, de forma objetiva, precisa y profesional.
-Tu objetivo es informar a ${nombre.split(' ')[0]} sobre el estado de sus finanzas sin emitir juicios.
-
-TU ROL COMO ANALISTA:
-- Presenta los datos tal cual son, sin sugerir cambios a menos que te lo pidan.
-- Responde con cifras exactas y porcentajes cuando sea relevante.
-- Si te piden un resumen, sé directo y estructurado.
-- No des consejos no solicitados ni motivaciones.
-- Mantén un tono neutro y profesional.
-- Puedes calcular proyecciones si te lo piden.
-- No inventes datos que no estén en el contexto.
-
-${DATOS_FINANCIEROS}
-`;
 
 const QUICK_CHIPS = [
   "¿Cuál es mi saldo?",
@@ -92,20 +10,10 @@ const QUICK_CHIPS = [
   "¿En qué gasto más?",
 ];
 
-const buildMsgBienvenida = (nombre) => ({ role: "bot", text: `¡Hola, ${nombre.split(' ')[0]}! 👋 Soy tu asistente FinanceSmart. Puedo ayudarte con tu saldo, movimientos, gastos e inversiones. ¿En qué te puedo ayudar?` });
-
-function cargarDesdeStorage(key, fallback) {
-  try {
-    const saved = localStorage.getItem(key);
-    if (!saved) return fallback;
-    const parsed = JSON.parse(saved);
-    // Discard any saved welcome message (first bot message) — always build fresh
-    if (Array.isArray(parsed) && parsed[0]?.role === "bot") return parsed.slice(1);
-    return parsed;
-  } catch {
-    return fallback;
-  }
-}
+const buildMsgBienvenida = (nombre) => ({
+  role: "bot",
+  text: `¡Hola, ${nombre.split(" ")[0]}! 👋 Soy tu asistente FinanceSmart. Puedo ayudarte con tu saldo, movimientos, gastos e inversiones. ¿En qué te puedo ayudar?`,
+});
 
 export default function Chatbot() {
   const { session } = useAuth();
@@ -113,11 +21,11 @@ export default function Chatbot() {
 
   useEffect(() => {
     if (!session) return;
-    fetch("http://localhost:3001/api/me", {
+    fetch("/api/me", {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.nombre) setNombreUsuario(`${data.nombre} ${data.apellido}`);
       })
       .catch(() => setNombreUsuario("Usuario"));
@@ -130,8 +38,6 @@ export default function Chatbot() {
   const [showSettings, setShowSettings] = useState(false);
   const [accepted, setAccepted]       = useState(() => localStorage.getItem("chat_disclaimer") === "true");
   const [mode, setMode]               = useState(() => localStorage.getItem("chat_mode") || "coach");
-  // Never persist the welcome message — always build it fresh from the real name
-  // Clear stale history once so old "Diego" context doesn't bleed into new sessions
   const [extraMessages, setExtraMessages] = useState(() => { localStorage.removeItem("chat_messages"); return []; });
   const [history, setHistory]         = useState(() => { localStorage.removeItem("chat_history"); return []; });
   const [pos, setPos]                 = useState({ x: null, y: null });
@@ -143,17 +49,16 @@ export default function Chatbot() {
   const bottomRef = useRef(null);
   const windowRef = useRef(null);
 
-  // messages shown in UI = welcome (always fresh) + conversation
   const messages = nombreUsuario
     ? [buildMsgBienvenida(nombreUsuario), ...extraMessages]
     : extraMessages;
 
   const setMessages = (updater) => {
-    setExtraMessages(prev => {
-      const current = typeof updater === "function"
-        ? updater([buildMsgBienvenida(nombreUsuario || "Usuario"), ...prev])
-        : updater;
-      // strip the welcome message before storing
+    setExtraMessages((prev) => {
+      const current =
+        typeof updater === "function"
+          ? updater([buildMsgBienvenida(nombreUsuario || "Usuario"), ...prev])
+          : updater;
       return current.slice(1);
     });
   };
@@ -209,28 +114,12 @@ export default function Chatbot() {
       const dx = e.clientX - s.x;
       const dy = e.clientY - s.y;
       let newW = s.w, newH = s.h, newX = s.posX, newY = s.posY;
-
-      if (resizing === "br") {
-        newW = s.w + dx;
-        newH = s.h + dy;
-      } else if (resizing === "bl") {
-        newW = s.w - dx;
-        newH = s.h + dy;
-        newX = s.posX + dx;
-      } else if (resizing === "tr") {
-        newW = s.w + dx;
-        newH = s.h - dy;
-        newY = s.posY + dy;
-      } else if (resizing === "tl") {
-        newW = s.w - dx;
-        newH = s.h - dy;
-        newX = s.posX + dx;
-        newY = s.posY + dy;
-      }
-
+      if (resizing === "br") { newW = s.w + dx; newH = s.h + dy; }
+      else if (resizing === "bl") { newW = s.w - dx; newH = s.h + dy; newX = s.posX + dx; }
+      else if (resizing === "tr") { newW = s.w + dx; newH = s.h - dy; newY = s.posY + dy; }
+      else if (resizing === "tl") { newW = s.w - dx; newH = s.h - dy; newX = s.posX + dx; newY = s.posY + dy; }
       newW = Math.max(300, Math.min(window.innerWidth - 20, newW));
       newH = Math.max(350, Math.min(window.innerHeight - 20, newH));
-
       setSize({ w: newW, h: newH });
       setPos({ x: Math.max(0, newX), y: Math.max(0, newY) });
     };
@@ -257,8 +146,6 @@ export default function Chatbot() {
     setShowSettings(false);
   };
 
-  const getSystemPrompt = () => mode === "coach" ? buildPromptCoach(nombreUsuario) : buildPromptAnalyst(nombreUsuario);
-
   const sendMessage = async (text) => {
     const msg = (text || input).trim();
     if (!msg || loading) return;
@@ -266,25 +153,31 @@ export default function Chatbot() {
     setMessages((prev) => [...prev, { role: "user", text: msg }]);
     setLoading(true);
 
-    const newHistory = [...history, { role: "user", parts: [{ text: msg }] }];
-
     try {
-      const res = await fetch(GEMINI_URL, {
+      const res = await fetch("/api/chatbot", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: getSystemPrompt() }] },
-          contents: newHistory,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ message: msg, history, mode }),
       });
 
       const data = await res.json();
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta.";
+      if (!res.ok) throw new Error(data.error || "Error del servidor");
 
-      setHistory([...newHistory, { role: "model", parts: [{ text: reply }] }]);
+      const reply = data.reply;
+      setHistory((prev) => [
+        ...prev,
+        { role: "user", parts: [{ text: msg }] },
+        { role: "model", parts: [{ text: reply }] },
+      ]);
       setMessages((prev) => [...prev, { role: "bot", text: reply }]);
     } catch {
-      setMessages((prev) => [...prev, { role: "bot", text: "Error de conexión. Intenta de nuevo." }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: "Error de conexión. Intenta de nuevo." },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -296,9 +189,10 @@ export default function Chatbot() {
         <div
           ref={windowRef}
           className={`chat-window${fullscreen ? " fullscreen" : ""}${dragging || resizing ? " dragging" : ""}`}
-          style={fullscreen
-            ? {}
-            : pos.x === null
+          style={
+            fullscreen
+              ? {}
+              : pos.x === null
               ? { bottom: 96, right: 28, width: size.w, height: size.h, maxHeight: size.h }
               : { left: pos.x, top: pos.y, bottom: "auto", right: "auto", width: size.w, height: size.h, maxHeight: size.h }
           }
@@ -317,18 +211,8 @@ export default function Chatbot() {
               <p>Modo {mode === "coach" ? "Coach" : "Analista"} · En línea</p>
             </div>
             <div className="chat-header-actions">
-              <button
-                className="chat-icon-btn"
-                onClick={() => setShowSettings((s) => !s)}
-                title="Configuración"
-              >
-                ⚙
-              </button>
-              <button
-                className="chat-icon-btn"
-                onClick={() => setFullscreen((f) => !f)}
-                title={fullscreen ? "Restaurar" : "Pantalla completa"}
-              >
+              <button className="chat-icon-btn" onClick={() => setShowSettings((s) => !s)} title="Configuración">⚙</button>
+              <button className="chat-icon-btn" onClick={() => setFullscreen((f) => !f)} title={fullscreen ? "Restaurar" : "Pantalla completa"}>
                 {fullscreen ? "⊡" : "⛶"}
               </button>
               <button className="chat-icon-btn" onClick={() => { setOpen(false); setFullscreen(false); setShowSettings(false); setPos({ x: null, y: null }); setSize({ w: 370, h: 520 }); }}>✕</button>
@@ -341,20 +225,14 @@ export default function Chatbot() {
                 Modo del asistente
                 <button className="settings-close" onClick={() => setShowSettings(false)}>✕</button>
               </div>
-              <div
-                className={`mode-option ${mode === "coach" ? "selected" : ""}`}
-                onClick={() => handleModeChange("coach")}
-              >
+              <div className={`mode-option ${mode === "coach" ? "selected" : ""}`} onClick={() => handleModeChange("coach")}>
                 <div className="mode-option-header">
                   <div className="mode-dot" />
                   <span className="mode-name">🎯 Coach Financiero</span>
                 </div>
                 <span className="mode-desc">Te propone metas, te da consejos para ahorrar, te sugiere inversiones y te motiva a mejorar tus hábitos financieros.</span>
               </div>
-              <div
-                className={`mode-option ${mode === "analyst" ? "selected" : ""}`}
-                onClick={() => handleModeChange("analyst")}
-              >
+              <div className={`mode-option ${mode === "analyst" ? "selected" : ""}`} onClick={() => handleModeChange("analyst")}>
                 <div className="mode-option-header">
                   <div className="mode-dot" />
                   <span className="mode-name">📊 Analista Financiero</span>
@@ -386,12 +264,13 @@ export default function Chatbot() {
 
           <div className="chat-messages">
             {messages.map((msg, i) => (
-              <div key={i} className={`msg ${msg.role}`} dangerouslySetInnerHTML={{
-                __html: msg.text
-                  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                  .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-                  .replace(/\n/g, "<br>")
-              }} />
+              <div key={i} className={`msg ${msg.role}`}>
+                {msg.role === "bot" ? (
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                ) : (
+                  msg.text
+                )}
+              </div>
             ))}
             {loading && (
               <div className="dot-anim">

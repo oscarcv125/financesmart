@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import PageLoader from "../components/Skeleton";
 import "../styles/tarjetas.css";
 
-const API_TARJETAS = "http://localhost:3001/api/tarjetas/";
-const API_DASHBOARD = "http://localhost:3001/api/dashboard/";
+const API_TARJETAS = "/api/tarjetas/";
+const API_DASHBOARD = "/api/dashboard/";
 
 export default function Tarjetas() {
   const { session } = useAuth();
@@ -62,7 +63,7 @@ export default function Tarjetas() {
     cargarSoloResumen(nuevoActivo);
   };
 
-  if (loading) return <div className="page-body">Cargando cuentas...</div>;
+  if (loading) return <PageLoader />;
 
   return (
     <main className="page-body">
