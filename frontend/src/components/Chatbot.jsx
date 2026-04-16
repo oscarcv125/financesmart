@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
 import "../styles/chatbot.css";
 
 const GEMINI_API_KEY = "AIzaSyAg1MnGuuu2Syzw4jfDVJQAY4xdx0UCoR0";
@@ -6,7 +7,7 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 const DATOS_FINANCIEROS = `
 === PERFIL DEL USUARIO ===
-Nombre: Diego García
+Nombre: Oscar Cardenas
 Banco: Banorte
 
 === DASHBOARD - ESTADO ACTUAL (Febrero 2026) ===
@@ -49,10 +50,10 @@ Alerta activa: El consumo en snacks y cafés (como Andatti) se está desviando d
 5. Fibra Inmobiliaria  — ROI: 9.50%  — Plazo: 365 días — Riesgo: Medio
 `;
 
-const PROMPT_COACH = `
-Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario Diego García en Banorte.
+const buildPromptCoach = (nombre) => `
+Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario ${nombre} en Banorte.
 Responde SIEMPRE en español, de forma motivadora, cercana y con iniciativa.
-Tu objetivo es ayudar a Diego a mejorar sus finanzas activamente.
+Tu objetivo es ayudar a ${nombre.split(' ')[0]} a mejorar sus finanzas activamente.
 
 TU ROL COMO COACH:
 - Propón metas de ahorro concretas basadas en sus datos.
@@ -67,10 +68,10 @@ TU ROL COMO COACH:
 ${DATOS_FINANCIEROS}
 `;
 
-const PROMPT_ANALYST = `
-Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario Diego García en Banorte.
+const buildPromptAnalyst = (nombre) => `
+Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario ${nombre} en Banorte.
 Responde SIEMPRE en español, de forma objetiva, precisa y profesional.
-Tu objetivo es informar a Diego sobre el estado de sus finanzas sin emitir juicios.
+Tu objetivo es informar a ${nombre.split(' ')[0]} sobre el estado de sus finanzas sin emitir juicios.
 
 TU ROL COMO ANALISTA:
 - Presenta los datos tal cual son, sin sugerir cambios a menos que te lo pidan.
@@ -91,18 +92,37 @@ const QUICK_CHIPS = [
   "¿En qué gasto más?",
 ];
 
-const MSG_BIENVENIDA = { role: "bot", text: "¡Hola, Diego! 👋 Soy tu asistente FinanceSmart. Puedo ayudarte con tu saldo, movimientos, gastos e inversiones. ¿En qué te puedo ayudar?" };
+const buildMsgBienvenida = (nombre) => ({ role: "bot", text: `¡Hola, ${nombre.split(' ')[0]}! 👋 Soy tu asistente FinanceSmart. Puedo ayudarte con tu saldo, movimientos, gastos e inversiones. ¿En qué te puedo ayudar?` });
 
 function cargarDesdeStorage(key, fallback) {
   try {
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    // Discard any saved welcome message (first bot message) — always build fresh
+    if (Array.isArray(parsed) && parsed[0]?.role === "bot") return parsed.slice(1);
+    return parsed;
   } catch {
     return fallback;
   }
 }
 
 export default function Chatbot() {
+  const { session } = useAuth();
+  const [nombreUsuario, setNombreUsuario] = useState(null);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch("http://localhost:3001/api/me", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.nombre) setNombreUsuario(`${data.nombre} ${data.apellido}`);
+      })
+      .catch(() => setNombreUsuario("Usuario"));
+  }, [session]);
+
   const [open, setOpen]               = useState(false);
   const [input, setInput]             = useState("");
   const [loading, setLoading]         = useState(false);
@@ -110,8 +130,10 @@ export default function Chatbot() {
   const [showSettings, setShowSettings] = useState(false);
   const [accepted, setAccepted]       = useState(() => localStorage.getItem("chat_disclaimer") === "true");
   const [mode, setMode]               = useState(() => localStorage.getItem("chat_mode") || "coach");
-  const [messages, setMessages]       = useState(() => cargarDesdeStorage("chat_messages", [MSG_BIENVENIDA]));
-  const [history, setHistory]         = useState(() => cargarDesdeStorage("chat_history", []));
+  // Never persist the welcome message — always build it fresh from the real name
+  // Clear stale history once so old "Diego" context doesn't bleed into new sessions
+  const [extraMessages, setExtraMessages] = useState(() => { localStorage.removeItem("chat_messages"); return []; });
+  const [history, setHistory]         = useState(() => { localStorage.removeItem("chat_history"); return []; });
   const [pos, setPos]                 = useState({ x: null, y: null });
   const [size, setSize]               = useState({ w: 370, h: 520 });
   const [dragging, setDragging]       = useState(false);
@@ -121,9 +143,24 @@ export default function Chatbot() {
   const bottomRef = useRef(null);
   const windowRef = useRef(null);
 
+  // messages shown in UI = welcome (always fresh) + conversation
+  const messages = nombreUsuario
+    ? [buildMsgBienvenida(nombreUsuario), ...extraMessages]
+    : extraMessages;
+
+  const setMessages = (updater) => {
+    setExtraMessages(prev => {
+      const current = typeof updater === "function"
+        ? updater([buildMsgBienvenida(nombreUsuario || "Usuario"), ...prev])
+        : updater;
+      // strip the welcome message before storing
+      return current.slice(1);
+    });
+  };
+
   useEffect(() => {
-    localStorage.setItem("chat_messages", JSON.stringify(messages));
-  }, [messages]);
+    localStorage.setItem("chat_messages", JSON.stringify(extraMessages));
+  }, [extraMessages]);
 
   useEffect(() => {
     localStorage.setItem("chat_history", JSON.stringify(history));
@@ -215,12 +252,12 @@ export default function Chatbot() {
     setMode(newMode);
     localStorage.setItem("chat_mode", newMode);
     setHistory([]);
-    setMessages([MSG_BIENVENIDA]);
+    setExtraMessages([]);
     localStorage.removeItem("chat_history");
     setShowSettings(false);
   };
 
-  const getSystemPrompt = () => mode === "coach" ? PROMPT_COACH : PROMPT_ANALYST;
+  const getSystemPrompt = () => mode === "coach" ? buildPromptCoach(nombreUsuario) : buildPromptAnalyst(nombreUsuario);
 
   const sendMessage = async (text) => {
     const msg = (text || input).trim();

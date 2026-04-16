@@ -80,7 +80,7 @@ router.patch('/:id/aportar', async (req, res) => {
         id_tarjeta: id_tarjeta,
         id_categoria: 29, 
         monto: -montoAporte,
-        tipo: 'Gasto',
+        tipo: 'gasto',
         descripcion: `Ahorro: ${metaActual.nombre_meta}`,
         fecha: new Date().toISOString()
       }]);
@@ -100,7 +100,8 @@ router.delete('/:id', async (req, res) => {
     const { error } = await supabase
       .from('ahorro_meta')
       .delete()
-      .eq('id_meta', req.params.id);
+      .eq('id_meta', req.params.id)
+      .eq('id_usuario', req.usuario.id_usuario);
       
     if (error) throw error;
     res.json({ success: true });

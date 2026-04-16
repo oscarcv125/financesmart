@@ -26,7 +26,7 @@ export default function Register() {
     }
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -36,8 +36,13 @@ export default function Register() {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
+    } else if (data.session) {
+      // Email confirmation is disabled — session is ready immediately
       navigate("/dashboard");
+    } else {
+      // Email confirmation is enabled — user must verify before logging in
+      setError("Revisa tu correo para confirmar tu cuenta antes de iniciar sesión.");
+      setLoading(false);
     }
   };
 

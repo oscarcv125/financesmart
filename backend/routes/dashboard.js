@@ -23,11 +23,11 @@ router.get('/', async (req, res) => {
     const movimientos = movsRes.data || [];
 
     const ingresos = movimientos
-      .filter(m => m.tipo === "Ingreso")
+      .filter(m => m.tipo?.toLowerCase() === "ingreso")
       .reduce((acc, m) => acc + Number(m.monto), 0);
 
     const gastos = movimientos
-      .filter(m => m.tipo === "Gasto")
+      .filter(m => m.tipo?.toLowerCase() === "gasto")
       .reduce((acc, m) => acc + Math.abs(Number(m.monto)), 0);
 
     res.json({
