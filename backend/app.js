@@ -13,6 +13,8 @@ require('dotenv').config();
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5173',
