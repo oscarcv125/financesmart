@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { supabase } from "../utils/supabaseclient";
 import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import "../styles/login.css";
@@ -10,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -20,6 +22,24 @@ export default function Login() {
       setLoading(false);
     } else {
       navigate("/dashboard");
+    }
+  };
+
+  const handleForgot = async () => {
+    if (!email) {
+      setError("Escribe tu correo para enviarte el enlace de recuperación.");
+      return;
+    }
+    setResetting(true);
+    setError("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetting(false);
+    if (error) {
+      setError(error.message);
+    } else {
+      toast.success("Te enviamos un enlace para restablecer tu contraseña.");
     }
   };
 
@@ -55,7 +75,9 @@ export default function Login() {
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
               <div className="forgot-link">
-                <button type="button">¿Olvidaste tu contraseña?</button>
+                <button type="button" onClick={handleForgot} disabled={resetting}>
+                  {resetting ? "Enviando..." : "¿Olvidaste tu contraseña?"}
+                </button>
               </div>
             </div>
 

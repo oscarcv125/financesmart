@@ -4,7 +4,7 @@ import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import { MdDashboard, MdSavings } from "react-icons/md";
 import { RiStockLine } from "react-icons/ri";
 import { BsCreditCard2Back } from "react-icons/bs";
-import { TbChartBar } from "react-icons/tb";
+import { TbChartBar, TbWallet, TbRepeat } from "react-icons/tb";
 import "../styles/sidebar.css";
 
 export default function Sidebar() {
@@ -17,6 +17,8 @@ export default function Sidebar() {
     { icon: TbChartBar,        label: "Análisis Financiero", path: "/analisis"    },
     { icon: BsCreditCard2Back, label: "Tarjetas y Cuentas",  path: "/tarjetas"    },
     { icon: MdSavings,         label: "Metas de Ahorro",     path: "/metas"       },
+    { icon: TbWallet,          label: "Presupuestos",        path: "/presupuestos"},
+    { icon: TbRepeat,          label: "Recurrentes",         path: "/recurrencias"},
   ];
 
   const handleLogout = async () => {
