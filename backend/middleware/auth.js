@@ -11,14 +11,45 @@ module.exports = async function authMiddleware(req, res, next) {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 
-  const { data: usuario, error: dbError } = await supabase
+  let { data: usuario, error: dbError } = await supabase
     .from('usuario')
     .select('*')
     .eq('email', user.email)
     .maybeSingle();
 
-  if (dbError || !usuario) {
-    return res.status(404).json({ error: 'Usuario no encontrado en la base de datos' });
+  if (dbError) {
+    return res.status(500).json({ error: 'Error consultando usuario' });
+  }
+
+  if (!usuario) {
+    const meta = user.user_metadata || {};
+    const nombre = (meta.nombre || user.email.split('@')[0] || 'Usuario').toString().trim();
+    const apellido = (meta.apellido || '').toString().trim();
+    const telefono = meta.telefono ? String(meta.telefono).trim() : null;
+    const perfil = meta.perfil ? String(meta.perfil).trim() : null;
+
+    const baseRow = { nombre, apellido, email: user.email };
+    const fullRow = { ...baseRow, telefono, perfil };
+
+    let inserted = await supabase.from('usuario').insert([fullRow]).select().maybeSingle();
+    if (inserted.error) {
+      inserted = await supabase.from('usuario').insert([baseRow]).select().maybeSingle();
+    }
+
+    if (inserted.error || !inserted.data) {
+      const { data: retry } = await supabase
+        .from('usuario')
+        .select('*')
+        .eq('email', user.email)
+        .maybeSingle();
+      usuario = retry || null;
+    } else {
+      usuario = inserted.data;
+    }
+
+    if (!usuario) {
+      return res.status(500).json({ error: 'No se pudo crear el perfil de usuario' });
+    }
   }
 
   req.user = user;
