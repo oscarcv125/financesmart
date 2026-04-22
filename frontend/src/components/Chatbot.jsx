@@ -1,7 +1,75 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import "../styles/chatbot.css";
+
+function ActionChips({ actions, tarjetas, onAportar, onNav }) {
+  const [picking, setPicking] = useState(null);
+  const [selectedTarjeta, setSelectedTarjeta] = useState("");
+  const [executing, setExecuting] = useState(false);
+
+  useEffect(() => {
+    if (tarjetas.length > 0) setSelectedTarjeta(String(tarjetas[0].id));
+  }, [tarjetas]);
+
+  async function handleChip(action) {
+    if (action.type === "nav") {
+      onNav(action.path);
+      return;
+    }
+    if (action.type === "aportar") {
+      if (tarjetas.length === 1) {
+        setExecuting(true);
+        await onAportar(action, tarjetas[0].id);
+        setExecuting(false);
+      } else {
+        setPicking(action);
+      }
+    }
+  }
+
+  async function confirmAportar() {
+    if (!selectedTarjeta || !picking) return;
+    setExecuting(true);
+    await onAportar(picking, Number(selectedTarjeta));
+    setExecuting(false);
+    setPicking(null);
+  }
+
+  if (executing) return <div className="action-chips"><span className="action-executing">Procesando...</span></div>;
+
+  if (picking) {
+    return (
+      <div className="action-chips tarjeta-picker">
+        <span className="picker-label">¿Con qué tarjeta?</span>
+        <select
+          className="picker-select"
+          value={selectedTarjeta}
+          onChange={(e) => setSelectedTarjeta(e.target.value)}
+        >
+          {tarjetas.map((t) => (
+            <option key={t.id} value={t.id}>{t.nombre}</option>
+          ))}
+        </select>
+        <div className="picker-btns">
+          <button className="picker-confirm" onClick={confirmAportar}>Confirmar</button>
+          <button className="picker-cancel" onClick={() => setPicking(null)}>Cancelar</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="action-chips">
+      {actions.map((action, i) => (
+        <button key={i} className="action-chip" onClick={() => handleChip(action)}>
+          {action.type === "aportar" ? "💰 " : "→ "}{action.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const COACH_CHIPS = [
   "¿En qué puedo ahorrar más?",
@@ -26,7 +94,9 @@ const buildMsgBienvenida = (nombre, mode) => ({
 
 export default function Chatbot() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [nombreUsuario, setNombreUsuario] = useState(null);
+  const [userTarjetas, setUserTarjetas] = useState([]);
 
   useEffect(() => {
     if (!session) return;
@@ -210,13 +280,14 @@ export default function Chatbot() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error del servidor");
 
-      const reply = data.reply;
+      const { reply, actions = [], tarjetas = [] } = data;
+      if (tarjetas.length > 0) setUserTarjetas(tarjetas);
       setHistory((prev) => [
         ...prev,
         { role: "user", parts: [{ text: msg }] },
         { role: "model", parts: [{ text: reply }] },
       ]);
-      setMessages((prev) => [...prev, { role: "bot", text: reply }]);
+      setMessages((prev) => [...prev, { role: "bot", text: reply, actions }]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -224,6 +295,36 @@ export default function Chatbot() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAportarAction = async (action, tarjetaId) => {
+    // Clear actions from the last bot message so chips disappear
+    setExtraMessages((prev) => {
+      const updated = [...prev];
+      const last = updated.length - 1;
+      if (last >= 0) updated[last] = { ...updated[last], actions: [] };
+      return updated;
+    });
+
+    try {
+      const res = await fetch(`/api/metas/${action.id_meta}/aportar`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ monto: action.monto, id_tarjeta: tarjetaId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al aportar");
+      const successText = `✅ Aporte de **$${Number(action.monto).toFixed(2)}** a **${action.nombre_meta}** realizado. Nuevo progreso: $${Number(data.nuevoProgreso).toFixed(2)}.`;
+      setExtraMessages((prev) => [...prev, { role: "bot", text: successText }]);
+    } catch (err) {
+      setExtraMessages((prev) => [
+        ...prev,
+        { role: "bot", text: `Error al realizar el aporte: ${err.message}` },
+      ]);
     }
   };
 
@@ -310,7 +411,17 @@ export default function Chatbot() {
             {messages.map((msg, i) => (
               <div key={i} className={`msg ${msg.role}`}>
                 {msg.role === "bot" ? (
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  <>
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    {msg.actions && msg.actions.length > 0 && i === messages.length - 1 && (
+                      <ActionChips
+                        actions={msg.actions}
+                        tarjetas={userTarjetas}
+                        onAportar={handleAportarAction}
+                        onNav={(path) => { navigate(path); setOpen(false); }}
+                      />
+                    )}
+                  </>
                 ) : (
                   msg.text
                 )}
