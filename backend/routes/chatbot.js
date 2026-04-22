@@ -99,7 +99,14 @@ async function fetchUserFinancialData(id_usuario) {
     return `- ${m.nombre_meta}: $${Number(m.progreso).toFixed(2)} / $${Number(m.monto_objetivo).toFixed(2)} (${pct}%)${vence}`;
   }).join('\n');
 
-  const presupuestos = (presupuestosRes.data || []).map(p => {
+  const recurrenciasRaw = recurrenciasRes.data || [];
+  const recurrencias = recurrenciasRaw.map(r =>
+    `- ${r.descripcion}: $${Math.abs(Number(r.monto)).toFixed(2)} (${r.tipo}, día ${r.dia_del_mes} de cada mes)`
+  ).join('\n');
+
+  const presupuestosRaw = presupuestosRes.data || [];
+  const presupuestoTotal = presupuestosRaw.reduce((acc, p) => acc + Number(p.monto), 0);
+  const presupuestos = presupuestosRaw.map(p => {
     const catNombre = p.categoria?.nombre || 'Sin categoría';
     const gastado = gastosPorCat[catNombre] || 0;
     const limite = Number(p.monto);
@@ -107,10 +114,6 @@ async function fetchUserFinancialData(id_usuario) {
     const alerta = pct >= 100 ? ' ⚠️ EXCEDIDO' : pct >= 80 ? ' ⚠️ cerca del límite' : '';
     return `- ${catNombre}: $${gastado.toFixed(2)} gastados / $${limite.toFixed(2)} presupuestado (${pct}%)${alerta}`;
   }).join('\n');
-
-  const recurrencias = (recurrenciasRes.data || []).map(r =>
-    `- ${r.descripcion}: $${Math.abs(Number(r.monto)).toFixed(2)} (${r.tipo}, día ${r.dia_del_mes} de cada mes)`
-  ).join('\n');
 
   const tarjetasRaw = tarjetasRes.data || [];
 
@@ -127,6 +130,40 @@ async function fetchUserFinancialData(id_usuario) {
     recurrencias,
     metasRaw,
     tarjetasRaw,
+    recurrenciasRaw,
+    presupuestoTotal
+  };
+}
+
+function calculateForecast(data) {
+  const now = new Date();
+  const today = now.getDate();
+  const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  
+  const daysPassed = Math.max(1, today);
+  const daysRemaining = totalDays - today;
+  
+  // Daily average based on current month spend
+  const dailyAvg = data.gastos / daysPassed;
+  const projectedVariable = dailyAvg * daysRemaining;
+  
+  // Fixed costs remaining (upcoming recurrences)
+  const upcomingRecurrencias = (data.recurrenciasRaw || [])
+    .filter(r => r.dia_del_mes > today)
+    .reduce((acc, r) => acc + Math.abs(Number(r.monto)), 0);
+    
+  const totalProjected = data.gastos + projectedVariable + upcomingRecurrencias;
+  const vsBudget = data.presupuestoTotal > 0 
+    ? Math.round((totalProjected / data.presupuestoTotal) * 100) 
+    : 0;
+
+  return {
+    dailyAvg,
+    projectedVariable,
+    upcomingRecurrencias,
+    totalProjected,
+    daysRemaining,
+    vsBudget
   };
 }
 
@@ -173,6 +210,26 @@ function suggestCoachActions(data) {
   return actions.slice(0, 3);
 }
 
+const CHART_RE = /\[CHART\]\s*([\s\S]*?)\s*\[\/CHART\]/;
+const VALID_CHART_TYPES = new Set(['pie', 'bar']);
+
+function extractChart(text) {
+  const match = text.match(CHART_RE);
+  if (!match) return { text, chart: null };
+
+  const cleanText = text.replace(CHART_RE, '').trim();
+  try {
+    const raw = JSON.parse(match[1].trim());
+    if (!VALID_CHART_TYPES.has(raw.type)) return { text: cleanText, chart: null };
+    if (!raw.title || typeof raw.title !== 'string') return { text: cleanText, chart: null };
+    if (!Array.isArray(raw.data) || raw.data.length === 0 || raw.data.length > 8) return { text: cleanText, chart: null };
+    if (!raw.data.every(d => typeof d.name === 'string' && typeof d.value === 'number')) return { text: cleanText, chart: null };
+    return { text: cleanText, chart: raw };
+  } catch {
+    return { text: cleanText, chart: null };
+  }
+}
+
 function pct(current, previous) {
   if (previous === 0) return current > 0 ? '+100%' : '0%';
   const delta = ((current - previous) / previous) * 100;
@@ -205,7 +262,23 @@ ${data.metas || 'Sin metas configuradas'}
 
 === CARGOS RECURRENTES ACTIVOS ===
 ${data.recurrencias || 'Sin recurrencias activas'}
+
+=== PROYECCIÓN DE FIN DE MES ===
+- Gasto proyectado total: $${data.forecast.totalProjected.toFixed(2)} MXN
+- Basado en: $${data.forecast.dailyAvg.toFixed(2)}/día de gasto variable + $${data.forecast.upcomingRecurrencias.toFixed(2)} de pagos fijos pendientes.
+- Días restantes: ${data.forecast.daysRemaining}
+- Estado vs presupuesto total: ${data.forecast.vsBudget}% consumido proyectado.
 `;
+
+  const chartInstructions = `
+=== INSTRUCCIÓN DE GRÁFICAS ===
+Cuando tu respuesta muestre un desglose, comparación o distribución de datos financieros, añade AL FINAL de tu respuesta un bloque con este formato exacto:
+[CHART]
+{"type":"pie","title":"Título corto","data":[{"name":"Categoría","value":1234}]}
+[/CHART]
+Tipos válidos: "pie" (distribuciones/desgloses), "bar" (comparaciones entre periodos o categorías).
+Para barras con dos series usa "value" y "value2". Máx 7 elementos. Nombres máx 12 caracteres. JSON en una sola línea.
+NO incluyas gráfica para saludos, consejos generales o preguntas simples de saldo.`;
 
   if (mode === 'analyst') {
     return `Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario ${nombre}.
@@ -213,7 +286,7 @@ Responde SIEMPRE en español, de forma objetiva, precisa y profesional.
 No des consejos no solicitados a menos que el usuario los pida explícitamente.
 Mantén un tono neutro. No inventes datos fuera del contexto financiero proporcionado.
 Si el usuario no ha enviado mensajes aún (primera interacción), proporciona un resumen financiero breve y objetivo: saldo, variación vs mes anterior, presupuestos cerca del límite o excedidos, y metas con progreso destacable. Sin opiniones.
-${contexto}`;
+${contexto}${chartInstructions}`;
   }
 
   return `Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario ${nombre}.
@@ -221,7 +294,7 @@ Responde SIEMPRE en español, de forma motivadora y cercana.
 Usa los datos financieros reales del usuario para proponer acciones concretas y alcanzables.
 Relaciona siempre tus consejos con sus metas de ahorro, sus presupuestos y sus cargos recurrentes.
 No inventes datos fuera del contexto financiero proporcionado.
-${contexto}`;
+${contexto}${chartInstructions}`;
 }
 
 router.post('/', async (req, res) => {
@@ -240,12 +313,13 @@ router.post('/', async (req, res) => {
   try {
     const nombre = `${req.usuario.nombre} ${req.usuario.apellido}`;
     const financialData = await fetchUserFinancialData(req.usuario.id_usuario);
+    financialData.forecast = calculateForecast(financialData);
     const systemPrompt = buildSystemPrompt(mode, nombre, financialData);
 
     const newHistory = [...history, { role: 'user', parts: [{ text: message }] }];
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -261,14 +335,15 @@ router.post('/', async (req, res) => {
     }
 
     const geminiData = await geminiRes.json();
-    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+    const rawReply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+    const { text: reply, chart } = extractChart(rawReply);
 
     const actions = mode === 'coach' ? suggestCoachActions(financialData) : [];
     const tarjetas = mode === 'coach'
       ? financialData.tarjetasRaw.map(t => ({ id: t.id_tarjeta, nombre: t.nombre }))
       : [];
 
-    res.json({ reply, actions, tarjetas });
+    res.json({ reply, chart, actions, tarjetas });
   } catch (error) {
     console.error('Error en chatbot:', error.message);
     res.status(500).json({ error: 'Error al procesar la consulta' });
@@ -276,3 +351,4 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.extractChart = extractChart;

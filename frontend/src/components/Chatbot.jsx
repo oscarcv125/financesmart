@@ -2,7 +2,63 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
+import {
+  PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer,
+} from "recharts";
 import "../styles/chatbot.css";
+
+const CHART_PALETTE = ["#cc0000", "#2196f3", "#4caf50", "#ff9800", "#9c27b0", "#00bcd4", "#ff5722", "#795548"];
+
+function fmtMXN(v) {
+  return `$${Number(v).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+function InlineChart({ chart }) {
+  if (!chart) return null;
+  const { type, title, data } = chart;
+
+  if (type === "pie") {
+    return (
+      <div className="inline-chart">
+        <p className="chart-title">{title}</p>
+        <ResponsiveContainer width="100%" height={210}>
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={74} paddingAngle={2}>
+              {data.map((_, i) => <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />)}
+            </Pie>
+            <Tooltip formatter={(v) => fmtMXN(v)} />
+            <Legend iconSize={9} wrapperStyle={{ fontSize: "10px" }} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  if (type === "bar") {
+    const hasSecond = data.some(d => d.value2 !== undefined);
+    return (
+      <div className="inline-chart">
+        <p className="chart-title">{title}</p>
+        <ResponsiveContainer width="100%" height={210}>
+          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 28, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" interval={0} />
+            <YAxis tick={{ fontSize: 9 }} width={42}
+              tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} />
+            <Tooltip formatter={(v) => fmtMXN(v)} />
+            {hasSecond && <Legend iconSize={9} wrapperStyle={{ fontSize: "10px" }} />}
+            <Bar dataKey="value" name="Este mes" fill="#cc0000" radius={[3, 3, 0, 0]} />
+            {hasSecond && <Bar dataKey="value2" name="Mes anterior" fill="#bbb" radius={[3, 3, 0, 0]} />}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 function ActionChips({ actions, tarjetas, onAportar, onNav }) {
   const [picking, setPicking] = useState(null);
@@ -153,6 +209,43 @@ export default function Chatbot() {
   const bottomRef = useRef(null);
   const windowRef = useRef(null);
   const analysisTriggered = useRef(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "es-MX";
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInput(transcript);
+          // Optional: automatically send after a small delay
+          // setTimeout(() => sendMessage(transcript), 500);
+        }
+      };
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Tu navegador no soporta reconocimiento de voz.");
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+    }
+  };
 
   const messages = nombreUsuario
     ? [buildMsgBienvenida(nombreUsuario, mode), ...extraMessages]
@@ -194,7 +287,7 @@ export default function Chatbot() {
           { role: "user", parts: [{ text: "Proporciona un análisis financiero objetivo y breve de mi situación actual." }] },
           { role: "model", parts: [{ text: data.reply }] },
         ]);
-        setExtraMessages([{ role: "bot", text: data.reply }]);
+        setExtraMessages([{ role: "bot", text: data.reply, chart: data.chart }]);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -305,14 +398,14 @@ export default function Chatbot() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error del servidor");
 
-      const { reply, actions = [], tarjetas = [] } = data;
+      const { reply, chart, actions = [], tarjetas = [] } = data;
       if (tarjetas.length > 0) setUserTarjetas(tarjetas);
       setHistory((prev) => [
         ...prev,
         { role: "user", parts: [{ text: msg }] },
         { role: "model", parts: [{ text: reply }] },
       ]);
-      setMessages((prev) => [...prev, { role: "bot", text: reply, actions }]);
+      setMessages((prev) => [...prev, { role: "bot", text: reply, chart, actions }]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -448,6 +541,7 @@ export default function Chatbot() {
                 {msg.role === "bot" ? (
                   <>
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    <InlineChart chart={msg.chart} />
                     {msg.actions && msg.actions.length > 0 && i === messages.length - 1 && (
                       <ActionChips
                         actions={msg.actions}
@@ -481,9 +575,16 @@ export default function Chatbot() {
           )}
 
           <div className="chat-input-row">
+            <button 
+              className={`chat-voice-btn ${isListening ? "listening" : ""}`}
+              onClick={toggleListening}
+              title={isListening ? "Escuchando..." : "Dictar mensaje"}
+            >
+              {isListening ? "🛑" : "🎤"}
+            </button>
             <input
               className="chat-input"
-              placeholder="Escribe tu pregunta..."
+              placeholder={isListening ? "Escuchando..." : "Escribe tu pregunta..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
