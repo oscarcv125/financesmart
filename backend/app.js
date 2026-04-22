@@ -12,6 +12,7 @@ const categoriasRoutes = require('./routes/categorias');
 const presupuestosRoutes = require('./routes/presupuestos');
 const recurrenciasRoutes = require('./routes/recurrencias');
 const chatbotRoutes = require('./routes/chatbot');
+const healthRoutes = require('./routes/health');
 const authMiddleware = require('./middleware/auth');
 require('dotenv').config();
 
@@ -66,5 +67,6 @@ app.use('/api/categorias', authMiddleware, categoriasRoutes);
 app.use('/api/presupuestos', authMiddleware, presupuestosRoutes);
 app.use('/api/recurrencias', authMiddleware, recurrenciasRoutes);
 app.use('/api/chatbot', chatbotLimit, authMiddleware, chatbotRoutes);
+app.use('/api/health', authMiddleware, healthRoutes);
 
 module.exports = app;

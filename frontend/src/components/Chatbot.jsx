@@ -71,6 +71,13 @@ function ActionChips({ actions, tarjetas, onAportar, onNav }) {
   );
 }
 
+const SCORE_COLORS = {
+  green:  '#22c55e',
+  yellow: '#eab308',
+  orange: '#f97316',
+  red:    '#ef4444',
+};
+
 const COACH_CHIPS = [
   "¿En qué puedo ahorrar más?",
   "¿Cómo avanzo en mis metas?",
@@ -97,6 +104,7 @@ export default function Chatbot() {
   const navigate = useNavigate();
   const [nombreUsuario, setNombreUsuario] = useState(null);
   const [userTarjetas, setUserTarjetas] = useState([]);
+  const [healthScore, setHealthScore] = useState(null);
 
   useEffect(() => {
     if (!session) return;
@@ -109,6 +117,23 @@ export default function Chatbot() {
       })
       .catch(() => setNombreUsuario("Usuario"));
   }, [session]);
+
+  const fetchHealthScore = useCallback(() => {
+    if (!session) return;
+    fetch("/api/health", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.score !== undefined) setHealthScore(data); })
+      .catch(() => {});
+  }, [session]);
+
+  useEffect(() => { fetchHealthScore(); }, [fetchHealthScore]);
+
+  // Refresh score when chat closes (contributions or other actions may have changed data)
+  useEffect(() => {
+    if (!open) fetchHealthScore();
+  }, [open, fetchHealthScore]);
 
   const [open, setOpen]               = useState(false);
   const [input, setInput]             = useState("");
@@ -353,7 +378,17 @@ export default function Chatbot() {
           <div className="chat-header" onMouseDown={handleMouseDown}>
             <div>
               <h3>🤖 Fortia AI</h3>
-              <p>Modo {mode === "coach" ? "Coach" : "Analista"} · En línea</p>
+              <p>
+                Modo {mode === "coach" ? "Coach" : "Analista"} · En línea
+                {healthScore !== null && (
+                  <span
+                    className="header-score"
+                    style={{ color: SCORE_COLORS[healthScore.color] }}
+                  >
+                    {" "}· {healthScore.score}/100 {healthScore.grade}
+                  </span>
+                )}
+              </p>
             </div>
             <div className="chat-header-actions">
               <button className="chat-icon-btn" onClick={() => setShowSettings((s) => !s)} title="Configuración">⚙</button>
@@ -467,6 +502,14 @@ export default function Chatbot() {
 
       <button className="fab" onClick={() => setOpen((o) => !o)}>
         {open ? "✕" : "🤖"}
+        {!open && healthScore !== null && (
+          <span
+            className="fab-score-badge"
+            style={{ background: SCORE_COLORS[healthScore.color] }}
+          >
+            {healthScore.score}
+          </span>
+        )}
       </button>
     </>
   );
