@@ -3,16 +3,25 @@ import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import "../styles/chatbot.css";
 
-const QUICK_CHIPS = [
-  "¿Cuál es mi saldo?",
-  "¿Cuánto gasté este mes?",
+const COACH_CHIPS = [
+  "¿En qué puedo ahorrar más?",
+  "¿Cómo avanzo en mis metas?",
+  "Dame un reto para esta semana",
   "¿Qué inversión me conviene?",
-  "¿En qué gasto más?",
 ];
 
-const buildMsgBienvenida = (nombre) => ({
+const ANALYST_CHIPS = [
+  "¿Cómo comparo con el mes pasado?",
+  "¿Qué presupuesto estoy excediendo?",
+  "¿Cuáles son mis gastos recurrentes?",
+  "¿Cuál es mi saldo actual?",
+];
+
+const buildMsgBienvenida = (nombre, mode) => ({
   role: "bot",
-  text: `¡Hola, ${nombre.split(" ")[0]}! 👋 Soy tu asistente FinanceSmart. Puedo ayudarte con tu saldo, movimientos, gastos e inversiones. ¿En qué te puedo ayudar?`,
+  text: mode === "analyst"
+    ? `Hola, ${nombre.split(" ")[0]}. Soy tu Analista Financiero. Analizando tu situación actual...`
+    : `¡Hola, ${nombre.split(" ")[0]}! 👋 Soy tu Coach Financiero. Estoy aquí para ayudarte a alcanzar tus metas y mejorar tus hábitos financieros. ¿Por dónde empezamos?`,
 });
 
 export default function Chatbot() {
@@ -48,20 +57,54 @@ export default function Chatbot() {
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0, posX: 0, posY: 0 });
   const bottomRef = useRef(null);
   const windowRef = useRef(null);
+  const analysisTriggered = useRef(false);
 
   const messages = nombreUsuario
-    ? [buildMsgBienvenida(nombreUsuario), ...extraMessages]
+    ? [buildMsgBienvenida(nombreUsuario, mode), ...extraMessages]
     : extraMessages;
 
   const setMessages = (updater) => {
     setExtraMessages((prev) => {
       const current =
         typeof updater === "function"
-          ? updater([buildMsgBienvenida(nombreUsuario || "Usuario"), ...prev])
+          ? updater([buildMsgBienvenida(nombreUsuario || "Usuario", mode), ...prev])
           : updater;
       return current.slice(1);
     });
   };
+
+  // Analyst auto-analysis: fires once when the chat opens with an empty history
+  useEffect(() => {
+    if (!open || mode !== "analyst" || !accepted || !session || extraMessages.length > 0) return;
+    if (analysisTriggered.current) return;
+    analysisTriggered.current = true;
+
+    setLoading(true);
+    fetch("/api/chatbot", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        message: "Proporciona un análisis financiero objetivo y breve de mi situación actual.",
+        history: [],
+        mode: "analyst",
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.reply) return;
+        setHistory([
+          { role: "user", parts: [{ text: "Proporciona un análisis financiero objetivo y breve de mi situación actual." }] },
+          { role: "model", parts: [{ text: data.reply }] },
+        ]);
+        setExtraMessages([{ role: "bot", text: data.reply }]);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, accepted, session]);
 
   useEffect(() => {
     localStorage.setItem("chat_messages", JSON.stringify(extraMessages));
@@ -144,6 +187,7 @@ export default function Chatbot() {
     setExtraMessages([]);
     localStorage.removeItem("chat_history");
     setShowSettings(false);
+    analysisTriggered.current = false;
   };
 
   const sendMessage = async (text) => {
@@ -280,9 +324,9 @@ export default function Chatbot() {
             <div ref={bottomRef} />
           </div>
 
-          {messages.length <= 1 && (
+          {messages.length <= 1 && !loading && (
             <div className="quick-chips">
-              {QUICK_CHIPS.map((chip, i) => (
+              {(mode === "analyst" ? ANALYST_CHIPS : COACH_CHIPS).map((chip, i) => (
                 <button key={i} className="chip" onClick={() => sendMessage(chip)}>
                   {chip}
                 </button>
