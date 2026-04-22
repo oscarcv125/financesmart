@@ -2,33 +2,83 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseserver');
 
+function monthBounds(offsetMonths = 0) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + offsetMonths;
+  const first = new Date(y, m, 1).toISOString().split('T')[0];
+  const firstNext = new Date(y, m + 1, 1).toISOString().split('T')[0];
+  return { first, firstNext };
+}
+
 async function fetchUserFinancialData(id_usuario) {
-  const { data: movimientos } = await supabase
-    .from('movimiento_financiero')
-    .select('monto, fecha, tipo, descripcion, categoria(nombre)')
-    .eq('id_usuario', id_usuario)
-    .order('fecha', { ascending: false })
-    .limit(20);
+  const { first: thisFirst, firstNext: thisNext } = monthBounds(0);
+  const { first: lastFirst, firstNext: lastNext } = monthBounds(-1);
 
-  const lista = movimientos || [];
+  const [movsRes, movsLastRes, metasRes, presupuestosRes, recurrenciasRes] = await Promise.all([
+    supabase
+      .from('movimiento_financiero')
+      .select('monto, fecha, tipo, descripcion, categoria(nombre)')
+      .eq('id_usuario', id_usuario)
+      .gte('fecha', thisFirst)
+      .lt('fecha', thisNext)
+      .order('fecha', { ascending: false }),
 
+    supabase
+      .from('movimiento_financiero')
+      .select('monto, tipo, id_categoria, categoria(nombre)')
+      .eq('id_usuario', id_usuario)
+      .gte('fecha', lastFirst)
+      .lt('fecha', lastNext),
+
+    supabase
+      .from('ahorro_meta')
+      .select('nombre_meta, monto_objetivo, progreso, fecha_limite')
+      .eq('id_usuario', id_usuario)
+      .order('id_meta', { ascending: true }),
+
+    supabase
+      .from('presupuesto')
+      .select('monto, id_categoria, categoria(nombre)')
+      .eq('id_usuario', id_usuario),
+
+    supabase
+      .from('recurrencia')
+      .select('descripcion, monto, tipo, dia_del_mes')
+      .eq('id_usuario', id_usuario)
+      .eq('activo', true)
+      .order('dia_del_mes', { ascending: true }),
+  ]);
+
+  const lista = movsRes.data || [];
+  const listaLast = movsLastRes.data || [];
+
+  // Current month totals
   const ingresos = lista
     .filter(m => m.tipo?.toLowerCase() === 'ingreso')
     .reduce((acc, m) => acc + Number(m.monto), 0);
-
   const gastos = lista
     .filter(m => m.tipo?.toLowerCase() === 'gasto')
     .reduce((acc, m) => acc + Math.abs(Number(m.monto)), 0);
 
-  const catAgrupadas = {};
+  // Last month totals (for comparison)
+  const ingresosLast = listaLast
+    .filter(m => m.tipo?.toLowerCase() === 'ingreso')
+    .reduce((acc, m) => acc + Number(m.monto), 0);
+  const gastosLast = listaLast
+    .filter(m => m.tipo?.toLowerCase() === 'gasto')
+    .reduce((acc, m) => acc + Math.abs(Number(m.monto)), 0);
+
+  // Spending by category this month (used for both topCategorias and presupuestos)
+  const gastosPorCat = {};
   lista
     .filter(m => m.tipo?.toLowerCase() === 'gasto')
     .forEach(m => {
       const cat = m.categoria?.nombre || 'Otros';
-      catAgrupadas[cat] = (catAgrupadas[cat] || 0) + Math.abs(Number(m.monto));
+      gastosPorCat[cat] = (gastosPorCat[cat] || 0) + Math.abs(Number(m.monto));
     });
 
-  const topCategorias = Object.entries(catAgrupadas)
+  const topCategorias = Object.entries(gastosPorCat)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
     .map(([nombre, monto]) => `- ${nombre}: $${monto.toFixed(2)}`)
@@ -38,37 +88,93 @@ async function fetchUserFinancialData(id_usuario) {
     `| ${m.fecha?.split('T')[0]} | ${m.descripcion || '-'} | ${m.tipo} | $${Math.abs(Number(m.monto)).toFixed(2)} |`
   ).join('\n');
 
-  return { saldo: ingresos - gastos, ingresos, gastos, topCategorias, movRecientes };
+  // Metas de ahorro with progress %
+  const metas = (metasRes.data || []).map(m => {
+    const pct = m.monto_objetivo > 0
+      ? Math.round((Number(m.progreso) / Number(m.monto_objetivo)) * 100)
+      : 0;
+    const vence = m.fecha_limite ? ` · vence ${m.fecha_limite}` : '';
+    return `- ${m.nombre_meta}: $${Number(m.progreso).toFixed(2)} / $${Number(m.monto_objetivo).toFixed(2)} (${pct}%)${vence}`;
+  }).join('\n');
+
+  // Presupuestos with how much has been spent this month
+  const presupuestos = (presupuestosRes.data || []).map(p => {
+    const catNombre = p.categoria?.nombre || 'Sin categoría';
+    const gastado = gastosPorCat[catNombre] || 0;
+    const limite = Number(p.monto);
+    const pct = limite > 0 ? Math.round((gastado / limite) * 100) : 0;
+    const alerta = pct >= 100 ? ' ⚠️ EXCEDIDO' : pct >= 80 ? ' ⚠️ cerca del límite' : '';
+    return `- ${catNombre}: $${gastado.toFixed(2)} gastados / $${limite.toFixed(2)} presupuestado (${pct}%)${alerta}`;
+  }).join('\n');
+
+  // Active recurring transactions
+  const recurrencias = (recurrenciasRes.data || []).map(r =>
+    `- ${r.descripcion}: $${Math.abs(Number(r.monto)).toFixed(2)} (${r.tipo}, día ${r.dia_del_mes} de cada mes)`
+  ).join('\n');
+
+  return {
+    saldo: ingresos - gastos,
+    ingresos,
+    gastos,
+    ingresosLast,
+    gastosLast,
+    topCategorias,
+    movRecientes,
+    metas,
+    presupuestos,
+    recurrencias,
+  };
+}
+
+function pct(current, previous) {
+  if (previous === 0) return current > 0 ? '+100%' : '0%';
+  const delta = ((current - previous) / previous) * 100;
+  return (delta >= 0 ? '+' : '') + delta.toFixed(1) + '%';
 }
 
 function buildSystemPrompt(mode, nombre, data) {
-  const datosFinancieros = `
-=== ESTADO FINANCIERO ACTUAL ===
-- Saldo disponible: $${data.saldo.toFixed(2)} MXN
-- Ingresos registrados: $${data.ingresos.toFixed(2)} MXN
-- Gastos registrados: $${data.gastos.toFixed(2)} MXN
+  const now = new Date();
+  const mesActual = now.toLocaleString('es-MX', { month: 'long', year: 'numeric' });
 
-=== MOVIMIENTOS RECIENTES ===
+  const contexto = `
+=== ESTADO FINANCIERO – ${mesActual.toUpperCase()} ===
+- Ingresos: $${data.ingresos.toFixed(2)} MXN (${pct(data.ingresos, data.ingresosLast)} vs mes anterior)
+- Gastos:   $${data.gastos.toFixed(2)} MXN (${pct(data.gastos, data.gastosLast)} vs mes anterior)
+- Saldo:    $${data.saldo.toFixed(2)} MXN
+
+=== MOVIMIENTOS RECIENTES (este mes) ===
 | Fecha | Descripción | Tipo | Monto |
 |-------|-------------|------|-------|
-${data.movRecientes}
+${data.movRecientes || '(sin movimientos)'}
 
 === TOP CATEGORÍAS DE GASTO ===
 ${data.topCategorias || 'Sin gastos registrados'}
+
+=== PRESUPUESTOS (avance del mes) ===
+${data.presupuestos || 'Sin presupuestos configurados'}
+
+=== METAS DE AHORRO ===
+${data.metas || 'Sin metas configuradas'}
+
+=== CARGOS RECURRENTES ACTIVOS ===
+${data.recurrencias || 'Sin recurrencias activas'}
 `;
 
   if (mode === 'analyst') {
     return `Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario ${nombre}.
 Responde SIEMPRE en español, de forma objetiva, precisa y profesional.
-No des consejos no solicitados. Mantén un tono neutro. No inventes datos fuera del contexto.
-${datosFinancieros}`;
+No des consejos no solicitados a menos que el usuario los pida explícitamente.
+Mantén un tono neutro. No inventes datos fuera del contexto financiero proporcionado.
+Si el usuario no ha enviado mensajes aún (primera interacción), proporciona un resumen financiero breve y objetivo: saldo, variación vs mes anterior, presupuestos cerca del límite o excedidos, y metas con progreso destacable. Sin opiniones.
+${contexto}`;
   }
 
   return `Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario ${nombre}.
 Responde SIEMPRE en español, de forma motivadora y cercana.
-Propón metas concretas, sugiere cómo reducir gastos, recomienda inversiones según su perfil.
-No inventes datos fuera del contexto.
-${datosFinancieros}`;
+Usa los datos financieros reales del usuario para proponer acciones concretas y alcanzables.
+Relaciona siempre tus consejos con sus metas de ahorro, sus presupuestos y sus cargos recurrentes.
+No inventes datos fuera del contexto financiero proporcionado.
+${contexto}`;
 }
 
 router.post('/', async (req, res) => {
