@@ -494,6 +494,97 @@
     padding-left: 18px;
 }
 
+.action-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.action-chip {
+    border: 1.5px solid #cc0000;
+    background: #fff8f8;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11px;
+    color: #cc0000;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.action-chip:hover {
+    background: #cc0000;
+    color: #fff;
+}
+
+.action-executing {
+    font-size: 11px;
+    color: #999;
+    font-style: italic;
+}
+
+.action-chips.tarjeta-picker {
+    flex-direction: column;
+    align-items: flex-start;
+    background: #f9f9f9;
+    border-radius: 10px;
+    padding: 10px 12px;
+    gap: 8px;
+}
+
+.picker-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+}
+
+.picker-select {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    color: #333;
+    background: #fff;
+    outline: none;
+}
+
+.picker-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.picker-confirm {
+    background: #cc0000;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+}
+
+.picker-confirm:hover { background: #aa0000; }
+
+.picker-cancel {
+    background: #f0f0f0;
+    color: #555;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+}
+
+.picker-cancel:hover { background: #e0e0e0; }
+
 .resize-handle-tl {
     position: absolute;
     top: 0;
