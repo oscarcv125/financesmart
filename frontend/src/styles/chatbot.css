@@ -15,10 +15,34 @@
     font-size: 24px;
     z-index: 1000;
     transition: transform 0.15s;
+    overflow: visible;
 }
 
 .fab:hover {
     transform: scale(1.08);
+}
+
+.fab-score-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    padding: 0 3px;
+    font-family: 'DM Sans', sans-serif;
+    pointer-events: none;
+}
+
+.header-score {
+    font-weight: 600;
 }
 
 .chat-window {
