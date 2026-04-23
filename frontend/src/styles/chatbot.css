@@ -533,3 +533,10 @@
     cursor: nwse-resize;
     z-index: 5;
 }
+
+.chat-estado{
+    font-size: 0.75rem;
+    color: #888;
+    margin: 0px 0px 0 8px;
+    animation: fadeIn 0.3s ease;
+}

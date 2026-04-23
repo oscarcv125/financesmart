@@ -44,6 +44,7 @@ export default function Chatbot() {
   const [size, setSize]               = useState({ w: 370, h: 520 });
   const [dragging, setDragging]       = useState(false);
   const [resizing, setResizing]       = useState(null);
+  const [estado, setEstado]         = useState("");
   const dragOffset = useRef({ x: 0, y: 0 });
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0, posX: 0, posY: 0 });
   const bottomRef = useRef(null);
@@ -152,6 +153,8 @@ export default function Chatbot() {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text: msg }]);
     setLoading(true);
+    setEstado("Analizando tu pregunta...");
+
 
     try {
       const res = await fetch("/api/chatbot", {
@@ -163,23 +166,42 @@ export default function Chatbot() {
         body: JSON.stringify({ message: msg, history, mode }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error del servidor");
-
-      const reply = data.reply;
-      setHistory((prev) => [
-        ...prev,
-        { role: "user", parts: [{ text: msg }] },
-        { role: "model", parts: [{ text: reply }] },
-      ]);
-      setMessages((prev) => [...prev, { role: "bot", text: reply }]);
+      const reader=res.body.getReader();
+      const decoder=new TextDecoder();
+      
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        const texto=decoder.decode(value);
+        const lineas=texto.split("\n").filter(l=>l.trim().startsWith("data:"));
+        
+        for (const linea of lineas){
+          const evento=JSON.parse(linea.replace('data:',''));
+          if (evento.tipo==='estado'){
+            setEstado(evento.texto);
+          }
+          else if(evento.tipo==='respuesta'){
+            const respuesta=evento.texto;
+            setHistory((prev) => [
+              ...prev,
+              { role: "user", parts: [{ text: msg }] },
+              { role: "model", parts: [{ text: evento.texto }] },
+            ]);
+            setMessages((prev) => [...prev, { role: "bot", text: evento.texto }]);
+          }else if(evento.tipo==='error'){
+            throw new Error(evento.error);
+          }
+      }
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
         { role: "bot", text: "Error de conexión. Intenta de nuevo." },
       ]);
     } finally {
+      
       setLoading(false);
+      setEstado("");
     }
   };
 
@@ -275,6 +297,7 @@ export default function Chatbot() {
             {loading && (
               <div className="dot-anim">
                 <span /><span /><span />
+                {estado && <p className="chat-estado">{estado}</p>}
               </div>
             )}
             <div ref={bottomRef} />
