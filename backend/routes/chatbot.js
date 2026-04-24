@@ -168,7 +168,8 @@ router.post('/', async (req, res) => {
         ];
 
         // Usamos DeepSeek-R1 en tu Xeon para razonar las herramientas
-        const response = await ollama.chat({
+        const response = await fetch(`${import_meta.env.VITE_API_URL}/api/chat`, {
+        method: "POST",
             model: 'llama3.1:8b',//'deepseek-r1:8b',
             messages: mensajes,
             tools: tools,
