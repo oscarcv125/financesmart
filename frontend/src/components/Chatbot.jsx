@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import "../styles/chatbot.css";
-
+import { BACKEND_URL } from "../config";
 const QUICK_CHIPS = [
   "¿Cuál es mi saldo?",
   "¿Cuánto gasté este mes?",

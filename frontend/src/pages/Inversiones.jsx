@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import PageLoader from "../components/Skeleton";
 import "../styles/inversiones.css";
+import { BACKEND_URL } from "../config";
 
 export default function Inversiones() {
   const { session } = useAuth();

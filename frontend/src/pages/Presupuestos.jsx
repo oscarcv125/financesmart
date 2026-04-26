@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/metasahorro.css";
+import { BACKEND_URL } from "../config";
 
 const colorPct = (p) => (p >= 100 ? "#EB0029" : p >= 80 ? "#FFA400" : "#6CC04A");
 

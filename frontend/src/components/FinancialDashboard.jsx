@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer,
   PieChart, Pie,
 } from "recharts";
-
+import { BACKEND_URL } from "../config";
 const TABS = ["Mensual", "Trimestral", "Anual"];
 
 const CustomBarLabel = ({ x, y, width, value }) => (
@@ -22,7 +22,7 @@ export default function FinancialDashboard() {
 
   useEffect(() => {
     axios
-      .get(`/api/finanzas/${activeTab.toLowerCase()}`)
+      .get(`${BACKEND_URL}/api/finanzas/${activeTab.toLowerCase()}`)
       .then((res) => {
         setBarData(res.data.barras);
         setPieData(res.data.pay);

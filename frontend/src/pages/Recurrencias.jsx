@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/metasahorro.css";
-
+import { BACKEND_URL } from "../config";
 export default function Recurrencias() {
   const { session } = useAuth();
   const [items, setItems] = useState([]);
