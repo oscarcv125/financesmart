@@ -20,12 +20,12 @@ export default function Chatbot() {
   const [nombreUsuario, setNombreUsuario] = useState(null);
   
   // Definimos la URL del backend desde las variables de entorno de Vite
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
   useEffect(() => {
     if (!session) return;
-    // Usamos la variable backendUrl aquí
-    fetch(`${backendUrl}/api/me`, {
+    // Usamos la variable BACKEND_URL aquí
+    fetch(`${BACKEND_URL}/api/me`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((res) => res.json())
@@ -33,7 +33,7 @@ export default function Chatbot() {
         if (data.nombre) setNombreUsuario(`${data.nombre} ${data.apellido}`);
       })
       .catch(() => setNombreUsuario("Usuario"));
-  }, [session, backendUrl]);
+  }, [session, BACKEND_URL]);
 
   const [open, setOpen]               = useState(false);
   const [input, setInput]             = useState("");
@@ -160,8 +160,8 @@ export default function Chatbot() {
     setEstado("Analizando tu pregunta...");
 
     try {
-      // Usamos la variable backendUrl aquí también
-      const res = await fetch(`${backendUrl}/api/chatbot`, {
+      // Usamos la variable BACKEND_URL aquí también
+      const res = await fetch(`${BACKEND_URL}/api/chatbot`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
