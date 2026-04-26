@@ -52,7 +52,7 @@ export default function Dashboard() {
 
   const cargarDashboard = useCallback(async () => {
     setLoading(true);
-    const url = tarjetaActiva ? `${BACKEND_URL}/api/dashboard?tarjetaId=${tarjetaActiva}` : "${BACKEND_URL}/api/dashboard";
+    const url = tarjetaActiva ? `${BACKEND_URL}/api/dashboard?tarjetaId=${tarjetaActiva}` : `${BACKEND_URL}/api/dashboard`;
     try {
       const res = await fetch(url, { headers: authHeaders() });
       const json = await res.json();
