@@ -28,9 +28,9 @@ export default function Recurrencias() {
   const cargar = useCallback(async () => {
     try {
       const [resR, resT, resC] = await Promise.all([
-        fetch("/api/recurrencias", { headers: authHeaders() }),
-        fetch("/api/tarjetas/", { headers: authHeaders() }),
-        fetch("/api/categorias", { headers: authHeaders() }),
+        fetch(`${backendUrl}/api/recurrencias`, { headers: authHeaders() }),
+        fetch(`${backendUrl}/api/tarjetas/`, { headers: authHeaders() }),
+        fetch(`${backendUrl}/api/categorias`, { headers: authHeaders() }),
       ]);
       const rData = await resR.json();
       const tData = await resT.json();
@@ -54,7 +54,7 @@ export default function Recurrencias() {
     if (!form.id_tarjeta) return toast.error("Selecciona tarjeta");
     setSaving(true);
     try {
-      const res = await fetch("/api/recurrencias", {
+      const res = await fetch(`${backendUrl}/api/recurrencias`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
@@ -77,7 +77,7 @@ export default function Recurrencias() {
   };
 
   const toggleActivo = async (r) => {
-    const res = await fetch(`/api/recurrencias/${r.id_recurrencia}`, {
+    const res = await fetch(`${backendUrl}/api/recurrencias/${r.id_recurrencia}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ activo: !r.activo }),
@@ -87,7 +87,7 @@ export default function Recurrencias() {
 
   const eliminar = async (id) => {
     if (!window.confirm("¿Eliminar recurrencia?")) return;
-    const res = await fetch(`/api/recurrencias/${id}`, { method: "DELETE", headers: authHeaders() });
+    const res = await fetch(`${backendUrl}/api/recurrencias/${id}`, { method: "DELETE", headers: authHeaders() });
     if (res.ok) cargar();
   };
 

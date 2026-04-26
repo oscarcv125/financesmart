@@ -19,7 +19,7 @@ export default function AnalisisFinanciero() {
   useEffect(() => {
     if (!session) return;
     setLoading(true);
-    fetch(`/api/analisis/resumen?periodo=${activeTab}`, {
+    fetch(`${backendUrl}/api/analisis/resumen?periodo=${activeTab}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(res => res.json())

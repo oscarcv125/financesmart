@@ -5,8 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/tarjetas.css";
 
-const API_TARJETAS = "/api/tarjetas/";
-const API_DASHBOARD = "/api/dashboard/";
+const API_TARJETAS = `${backendUrl}/api/tarjetas/`;
+const API_DASHBOARD = `${backendUrl}/api/dashboard/`;
 
 export default function Tarjetas() {
   const { session } = useAuth();

@@ -19,8 +19,8 @@ export default function Inversiones() {
   useEffect(() => {
     if (!session) return;
     Promise.all([
-      fetch("/api/inversion/lista", { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
-      fetch("/api/tarjetas/", { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
+      fetch(`${backendUrl}/api/inversion/lista`, { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
+      fetch(`${backendUrl}/api/tarjetas/`, { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
     ])
       .then(([invData, tarjData]) => {
         setInversiones(Array.isArray(invData) ? invData : []);
@@ -55,7 +55,7 @@ export default function Inversiones() {
     }
     setComprando(true);
     try {
-      const res = await fetch("/api/inversion/comprar", {
+      const res = await fetch(`${backendUrl}/api/inversion/comprar`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

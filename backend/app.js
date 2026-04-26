@@ -24,12 +24,7 @@ const allowedOrigins = [
   'http://localhost:5173',
 ].filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  }
-}));
+app.use(cors({ origin: 'https://tu-proyecto.vercel.app' }));
 
 app.use(express.json());
 

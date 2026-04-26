@@ -31,7 +31,7 @@ export default function Dashboard() {
 
   const cargarTarjetas = useCallback(async () => {
     try {
-      const res = await fetch("/api/tarjetas/", { headers: authHeaders() });
+      const res = await fetch(`${backendUrl}/api/tarjetas`, { headers: authHeaders() });
       const json = await res.json();
       setTarjetas(Array.isArray(json) ? json : []);
     } catch (err) {
@@ -41,7 +41,7 @@ export default function Dashboard() {
 
   const cargarCategorias = useCallback(async () => {
     try {
-      const res = await fetch("/api/categorias", { headers: authHeaders() });
+      const res = await fetch(`${backendUrl}/api/categorias`, { headers: authHeaders() });
       const json = await res.json();
       setCategorias(Array.isArray(json) ? json : []);
     } catch (err) {
@@ -51,7 +51,7 @@ export default function Dashboard() {
 
   const cargarDashboard = useCallback(async () => {
     setLoading(true);
-    const url = tarjetaActiva ? `/api/dashboard?tarjetaId=${tarjetaActiva}` : "/api/dashboard";
+    const url = tarjetaActiva ? `${backendUrl}/api/dashboard?tarjetaId=${tarjetaActiva}` : "/api/dashboard";
     try {
       const res = await fetch(url, { headers: authHeaders() });
       const json = await res.json();
@@ -100,7 +100,7 @@ export default function Dashboard() {
     if (!form.id_tarjeta) return toast.error("Selecciona una tarjeta");
     setSaving(true);
     try {
-      const res = await fetch("/api/movimientos", {
+      const res = await fetch(`${backendUrl}/api/movimientos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
@@ -127,7 +127,7 @@ export default function Dashboard() {
   const eliminarMovimiento = async (id) => {
     if (!window.confirm("¿Eliminar este movimiento?")) return;
     try {
-      const res = await fetch(`/api/movimientos/${id}`, {
+      const res = await fetch(`${backendUrl}/api/movimientos/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -144,7 +144,7 @@ export default function Dashboard() {
 
   const exportarCsv = async () => {
     try {
-      const res = await fetch("/api/movimientos/export", { headers: authHeaders() });
+      const res = await fetch(`${backendUrl}/api/movimientos/export`, { headers: authHeaders() });
       if (!res.ok) throw new Error("Error al exportar");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

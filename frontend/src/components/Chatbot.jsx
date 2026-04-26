@@ -18,10 +18,14 @@ const buildMsgBienvenida = (nombre) => ({
 export default function Chatbot() {
   const { session } = useAuth();
   const [nombreUsuario, setNombreUsuario] = useState(null);
+  
+  // Definimos la URL del backend desde las variables de entorno de Vite
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 
   useEffect(() => {
     if (!session) return;
-    fetch("/api/me", {
+    // Usamos la variable backendUrl aquí
+    fetch(`${backendUrl}/api/me`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((res) => res.json())
@@ -29,7 +33,7 @@ export default function Chatbot() {
         if (data.nombre) setNombreUsuario(`${data.nombre} ${data.apellido}`);
       })
       .catch(() => setNombreUsuario("Usuario"));
-  }, [session]);
+  }, [session, backendUrl]);
 
   const [open, setOpen]               = useState(false);
   const [input, setInput]             = useState("");
@@ -155,9 +159,9 @@ export default function Chatbot() {
     setLoading(true);
     setEstado("Analizando tu pregunta...");
 
-
     try {
-      const res = await fetch("/api/chatbot", {
+      // Usamos la variable backendUrl aquí también
+      const res = await fetch(`${backendUrl}/api/chatbot`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -199,7 +203,6 @@ export default function Chatbot() {
         { role: "bot", text: "Error de conexión. Intenta de nuevo." },
       ]);
     } finally {
-      
       setLoading(false);
       setEstado("");
     }
