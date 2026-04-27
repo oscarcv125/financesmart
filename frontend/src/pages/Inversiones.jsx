@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import PageLoader from "../components/Skeleton";
 import "../styles/inversiones.css";
+import { BACKEND_URL } from "../config";
 
 export default function Inversiones() {
   const { session } = useAuth();
@@ -19,8 +20,8 @@ export default function Inversiones() {
   useEffect(() => {
     if (!session) return;
     Promise.all([
-      fetch("/api/inversion/lista", { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
-      fetch("/api/tarjetas/", { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
+      fetch(`${BACKEND_URL}/api/inversion/lista`, { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
+      fetch(`${BACKEND_URL}/api/tarjetas/`, { headers: { Authorization: `Bearer ${session.access_token}` } }).then(r => r.json()),
     ])
       .then(([invData, tarjData]) => {
         setInversiones(Array.isArray(invData) ? invData : []);
@@ -55,7 +56,7 @@ export default function Inversiones() {
     }
     setComprando(true);
     try {
-      const res = await fetch("/api/inversion/comprar", {
+      const res = await fetch(`${BACKEND_URL}/api/inversion/comprar`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

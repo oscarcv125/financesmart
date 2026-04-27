@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { supabase } from "../utils/supabaseclient";
 import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import "../styles/login.css";
+import { BACKEND_URL } from "../config";
 
 export default function Login() {
   const navigate = useNavigate();

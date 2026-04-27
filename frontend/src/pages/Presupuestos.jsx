@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/metasahorro.css";
+import { BACKEND_URL } from "../config";
 
 const colorPct = (p) => (p >= 100 ? "#EB0029" : p >= 80 ? "#FFA400" : "#6CC04A");
 
@@ -21,8 +22,8 @@ export default function Presupuestos() {
   const cargar = useCallback(async () => {
     try {
       const [resP, resC] = await Promise.all([
-        fetch("/api/presupuestos", { headers: authHeaders() }),
-        fetch("/api/categorias?tipo=Gasto", { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/presupuestos`, { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/categorias?tipo=Gasto`, { headers: authHeaders() }),
       ]);
       const pData = await resP.json();
       const cData = await resC.json();
@@ -52,7 +53,7 @@ export default function Presupuestos() {
     if (!m || m <= 0) return toast.error("Monto inválido");
     setSaving(true);
     try {
-      const res = await fetch("/api/presupuestos", {
+      const res = await fetch(`${BACKEND_URL}/api/presupuestos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ id_categoria: form.id_categoria, monto: m }),
@@ -72,7 +73,7 @@ export default function Presupuestos() {
 
   const eliminar = async (id) => {
     if (!window.confirm("¿Eliminar presupuesto?")) return;
-    const res = await fetch(`/api/presupuestos/${id}`, { method: "DELETE", headers: authHeaders() });
+    const res = await fetch(`${BACKEND_URL}/api/presupuestos/${id}`, { method: "DELETE", headers: authHeaders() });
     if (res.ok) cargar();
   };
 

@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/metasahorro.css";
-
+import { BACKEND_URL } from "../config";
 export default function Recurrencias() {
   const { session } = useAuth();
   const [items, setItems] = useState([]);
@@ -28,9 +28,9 @@ export default function Recurrencias() {
   const cargar = useCallback(async () => {
     try {
       const [resR, resT, resC] = await Promise.all([
-        fetch("/api/recurrencias", { headers: authHeaders() }),
-        fetch("/api/tarjetas/", { headers: authHeaders() }),
-        fetch("/api/categorias", { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/recurrencias`, { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/tarjetas/`, { headers: authHeaders() }),
+        fetch(`${BACKEND_URL}/api/categorias`, { headers: authHeaders() }),
       ]);
       const rData = await resR.json();
       const tData = await resT.json();
@@ -54,7 +54,7 @@ export default function Recurrencias() {
     if (!form.id_tarjeta) return toast.error("Selecciona tarjeta");
     setSaving(true);
     try {
-      const res = await fetch("/api/recurrencias", {
+      const res = await fetch(`${BACKEND_URL}/api/recurrencias`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
@@ -77,7 +77,7 @@ export default function Recurrencias() {
   };
 
   const toggleActivo = async (r) => {
-    const res = await fetch(`/api/recurrencias/${r.id_recurrencia}`, {
+    const res = await fetch(`${BACKEND_URL}/api/recurrencias/${r.id_recurrencia}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ activo: !r.activo }),
@@ -87,7 +87,7 @@ export default function Recurrencias() {
 
   const eliminar = async (id) => {
     if (!window.confirm("¿Eliminar recurrencia?")) return;
-    const res = await fetch(`/api/recurrencias/${id}`, { method: "DELETE", headers: authHeaders() });
+    const res = await fetch(`${BACKEND_URL}/api/recurrencias/${id}`, { method: "DELETE", headers: authHeaders() });
     if (res.ok) cargar();
   };
 
