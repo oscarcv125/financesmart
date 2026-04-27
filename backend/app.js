@@ -24,14 +24,9 @@ const allowedOrigins = [
   'http://localhost:5173',
 ].filter(Boolean);
 
-app.use(cors({
-  origin: [
-    'https://financesmart1-ov6t3f243-neonalex117s-projects.vercel.app', // Tu URL de Vercel
-    'http://localhost:5173' // Para que sigas pudiendo probar local
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
+app.use(express.json());
+
 app.use(express.json());
 
 const generalLimit = rateLimit({
