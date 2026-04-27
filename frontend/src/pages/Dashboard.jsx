@@ -25,6 +25,24 @@ export default function Dashboard() {
     fecha: hoy,
   });
 
+  const [filtros, setFiltros ] = useState({
+    fechaInicio: "",
+    fechaFin: "",
+    categoria: "",
+    montoMin: "",
+    montoMax: "",
+  });
+  const [filtrosVisibles, setFiltrosVisibles] = useState(false);
+  function filtroMovimientos(mov){
+    if(filtros.fechaInicio && mov.fecha < filtros.fechaInicio) return false;
+    if(filtros.fechaFin && mov.fecha > filtros.fechaFin) return false;
+    if(filtros.categoria && mov.categoria.nombre !== filtros.categoria) return false;
+    if(filtros.montoMin && Math.abs(mov.monto) < parseFloat(filtros.montoMin)) return false;
+    if(filtros.montoMax && Math.abs(mov.monto) > parseFloat(filtros.montoMax)) return false;
+    return true;
+  }
+
+
   const authHeaders = useCallback(
     () => ({ Authorization: `Bearer ${session.access_token}` }),
     [session]
@@ -167,6 +185,8 @@ export default function Dashboard() {
       : String(c.tipo || "").toLowerCase() !== "ingreso"
   );
 
+  const movimientosFiltrados = data?.movimientos.filter(filtroMovimientos) || [];
+
   if (loading && !data) return <PageLoader />;
   if (!data) return <div className="page-body">Error al cargar datos.</div>;
 
@@ -222,7 +242,29 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
-
+      
+      <div style={{marginBottom:1}}>
+        <button className="modal-btn" onClick={() => setFiltrosVisibles(v => !v)}>
+          Filtros {filtrosVisibles ? "▲" : "▼"}
+        </button>
+        {filtrosVisibles && (
+      <div style={{display:'flex',gap:8,marginBottom:2,flexWrap:'wrap', width:'fit-content'}}>
+        <input type="date" className="modal-input"  value={filtros.fechaInicio} onChange={e => setFiltros(f => ({ ...f, fechaInicio: e.target.value }))} />
+        <input type="date" className="modal-input"  value={filtros.fechaFin} onChange={e => setFiltros(f => ({ ...f, fechaFin: e.target.value }))} />
+        <select className="modal-input"  value={filtros.categoria} onChange={e => setFiltros(f => ({ ...f, categoria: e.target.value }))}>
+          <option value="">Todas las categorías</option>
+          {[...new Set(data.movimientos.map(m => m.categoria?.nombre).filter(Boolean))].map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <input type="number" className="modal-input"  placeholder="Monto mínimo" value={filtros.montoMin} onChange={e => setFiltros(f => ({ ...f, montoMin: e.target.value }))} />
+        <input type="number" className="modal-input"  placeholder="Monto máximo" value={filtros.montoMax} onChange={e => setFiltros(f => ({ ...f, montoMax: e.target.value }))} />
+        <button className="modal-btn" onClick={()=> setFiltros({fechaInicio:'', fechaFin:'', categoria:'', montoMin:'',montoMax:''})}>
+          Limpiar Filtros
+        </button>
+        </div>
+        )}
+      </div>
       <div className="movimientos-card">
         <table className="mov-table">
           <thead>
@@ -235,7 +277,7 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {data.movimientos.map((mov) => (
+            {movimientosFiltrados.map((mov) => (
               <tr key={mov.id}>
                 <td>{new Date(mov.fecha).toLocaleDateString()}</td>
                 <td>{mov.descripcion}</td>
@@ -250,7 +292,7 @@ export default function Dashboard() {
                 </td>
               </tr>
             ))}
-            {data.movimientos.length === 0 && (
+            {movimientosFiltrados.length === 0 && (
               <tr><td colSpan="5" style={{ padding: 24, textAlign: "center", color: "#888" }}>Sin movimientos todavía.</td></tr>
             )}
           </tbody>
