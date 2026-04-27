@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { supabase } from "../utils/supabaseclient";
 import banorteLogo from "../assets/Logo_de_Banorte.svg";
 import "../styles/login.css";
-
+import { BACKEND_URL } from "../config";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");

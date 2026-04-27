@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import "../styles/chatbot.css";
-
+import { BACKEND_URL } from "../config";
 const QUICK_CHIPS = [
   "¿Cuál es mi saldo?",
   "¿Cuánto gasté este mes?",
@@ -18,10 +18,14 @@ const buildMsgBienvenida = (nombre) => ({
 export default function Chatbot() {
   const { session } = useAuth();
   const [nombreUsuario, setNombreUsuario] = useState(null);
+  
+  // Definimos la URL del backend desde las variables de entorno de Vite
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
   useEffect(() => {
     if (!session) return;
-    fetch("/api/me", {
+    // Usamos la variable BACKEND_URL aquí
+    fetch(`${BACKEND_URL}/api/me`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((res) => res.json())
@@ -29,7 +33,7 @@ export default function Chatbot() {
         if (data.nombre) setNombreUsuario(`${data.nombre} ${data.apellido}`);
       })
       .catch(() => setNombreUsuario("Usuario"));
-  }, [session]);
+  }, [session, BACKEND_URL]);
 
   const [open, setOpen]               = useState(false);
   const [input, setInput]             = useState("");
@@ -155,9 +159,9 @@ export default function Chatbot() {
     setLoading(true);
     setEstado("Analizando tu pregunta...");
 
-
     try {
-      const res = await fetch("/api/chatbot", {
+      // Usamos la variable BACKEND_URL aquí también
+      const res = await fetch(`${BACKEND_URL}/api/chatbot`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -199,7 +203,6 @@ export default function Chatbot() {
         { role: "bot", text: "Error de conexión. Intenta de nuevo." },
       ]);
     } finally {
-      
       setLoading(false);
       setEstado("");
     }

@@ -4,6 +4,7 @@ import { TbPlus, TbTrash, TbDownload } from "react-icons/tb";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
+import { BACKEND_URL } from "../config";
 
 export default function Dashboard() {
   const { session } = useAuth();
@@ -31,7 +32,7 @@ export default function Dashboard() {
 
   const cargarTarjetas = useCallback(async () => {
     try {
-      const res = await fetch("/api/tarjetas/", { headers: authHeaders() });
+      const res = await fetch(`${BACKEND_URL}/api/tarjetas`, { headers: authHeaders() });
       const json = await res.json();
       setTarjetas(Array.isArray(json) ? json : []);
     } catch (err) {
@@ -41,7 +42,7 @@ export default function Dashboard() {
 
   const cargarCategorias = useCallback(async () => {
     try {
-      const res = await fetch("/api/categorias", { headers: authHeaders() });
+      const res = await fetch(`${BACKEND_URL}/api/categorias`, { headers: authHeaders() });
       const json = await res.json();
       setCategorias(Array.isArray(json) ? json : []);
     } catch (err) {
@@ -51,7 +52,7 @@ export default function Dashboard() {
 
   const cargarDashboard = useCallback(async () => {
     setLoading(true);
-    const url = tarjetaActiva ? `/api/dashboard?tarjetaId=${tarjetaActiva}` : "/api/dashboard";
+    const url = tarjetaActiva ? `${BACKEND_URL}/api/dashboard?tarjetaId=${tarjetaActiva}` : `${BACKEND_URL}/api/dashboard`;
     try {
       const res = await fetch(url, { headers: authHeaders() });
       const json = await res.json();
@@ -100,7 +101,7 @@ export default function Dashboard() {
     if (!form.id_tarjeta) return toast.error("Selecciona una tarjeta");
     setSaving(true);
     try {
-      const res = await fetch("/api/movimientos", {
+      const res = await fetch(`${BACKEND_URL}/api/movimientos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
@@ -127,7 +128,7 @@ export default function Dashboard() {
   const eliminarMovimiento = async (id) => {
     if (!window.confirm("¿Eliminar este movimiento?")) return;
     try {
-      const res = await fetch(`/api/movimientos/${id}`, {
+      const res = await fetch(`${BACKEND_URL}/api/movimientos/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -144,7 +145,7 @@ export default function Dashboard() {
 
   const exportarCsv = async () => {
     try {
-      const res = await fetch("/api/movimientos/export", { headers: authHeaders() });
+      const res = await fetch(`${BACKEND_URL}/api/movimientos/export`, { headers: authHeaders() });
       if (!res.ok) throw new Error("Error al exportar");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

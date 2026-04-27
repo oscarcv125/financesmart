@@ -4,8 +4,9 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/metasahorro.css";
+import { BACKEND_URL } from "../config";
 
-const API_URL = "/api/metas/";
+const API_URL = `${BACKEND_URL}/api/metas/`;
 const colorPorPct = (p) => p >= 80 ? "#6CC04A" : p >= 50 ? "#FFA400" : "#EB0029";
 
 export default function MetasAhorro() {

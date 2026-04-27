@@ -4,9 +4,9 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/tarjetas.css";
-
-const API_TARJETAS = "/api/tarjetas/";
-const API_DASHBOARD = "/api/dashboard/";
+import { BACKEND_URL } from "../config";
+const API_TARJETAS = `${BACKEND_URL}/api/tarjetas/`;
+const API_DASHBOARD = `${BACKEND_URL}/api/dashboard/`;
 
 export default function Tarjetas() {
   const { session } = useAuth();
