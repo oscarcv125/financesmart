@@ -180,7 +180,10 @@ router.post('/', async (req, res) => {
                 const msgsEstado = {
                     obtener_resumen_financiero: 'Calculando resumen...',
                     obtener_gastos_por_categoria: 'Analizando categorías...',
-                    obtener_movimientos: 'Buscando movimientos...'
+                    obtener_movimientos: 'Buscando movimientos...',
+                    obtener_metas_ahorro:'Consultando tus metas de ahorro...',
+                    obtener_inversiones:'Verificando tus inversiones...',
+                    obtener_tarjetas:'Revisando tus tarjetas...'
                 };
                 sendEvent('estado', { texto: msgsEstado[tool.function.name] || 'Consultando...' });
 
