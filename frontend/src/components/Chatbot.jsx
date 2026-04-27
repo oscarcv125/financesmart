@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  LineChart, Line, ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import "../styles/chatbot.css";
@@ -43,9 +44,169 @@ function computeSimulatorOutput(type, values, params, meta) {
         },
       };
     }
+    case "compound_savings": {
+      const monthly = get(0);
+      const years = get(1);
+      const annualRate = get(2);
+      const months = years * 12;
+      const monthlyRate = annualRate / 100 / 12;
+      let total = 0;
+      if (monthlyRate > 0) {
+        total = monthly * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+      } else {
+        total = monthly * months;
+      }
+      const contributed = monthly * months;
+      const interest = total - contributed;
+
+      // Build a yearly chart series for visualization
+      const chartData = [];
+      const stepYears = Math.max(1, Math.round(years / 12));
+      for (let y = 0; y <= years; y += stepYears) {
+        const m = y * 12;
+        let v = monthlyRate > 0
+          ? monthly * ((Math.pow(1 + monthlyRate, m) - 1) / monthlyRate)
+          : monthly * m;
+        chartData.push({ name: `${y}a`, value: Math.round(v) });
+      }
+      if (chartData[chartData.length - 1].name !== `${years}a`) {
+        chartData.push({ name: `${years}a`, value: Math.round(total) });
+      }
+
+      return {
+        primary: { label: "Monto final", value: total },
+        secondary: [
+          { label: "Aportado", value: contributed },
+          { label: "Intereses", value: interest },
+        ],
+        chart: chartData,
+      };
+    }
     default:
       return { primary: { label: "—", value: 0 } };
   }
+}
+
+function InlineInsights({ insights }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!insights || !insights.length) return null;
+  const high = insights.filter((i) => i.severity === "high");
+  const visible = expanded ? insights : (high.length > 0 ? high.slice(0, 1) : insights.slice(0, 1));
+  const hidden = insights.length - visible.length;
+  return (
+    <div className="inline-insights">
+      <button
+        className="insights-header"
+        onClick={() => setExpanded((e) => !e)}
+        type="button"
+      >
+        <span>💡 {insights.length} {insights.length === 1 ? "detección" : "detecciones"}</span>
+        <span className="insights-toggle">{expanded ? "▴ ocultar" : `▾ ver todo`}</span>
+      </button>
+      {visible.map((ins, i) => (
+        <div key={i} className={`insight-row sev-${ins.severity}`}>
+          <span className="insight-icon">{ins.icon}</span>
+          <div className="insight-body">
+            <div className="insight-title">{ins.title}</div>
+            <div className="insight-detail">{ins.detail}</div>
+          </div>
+        </div>
+      ))}
+      {!expanded && hidden > 0 && (
+        <button
+          className="insights-more"
+          onClick={() => setExpanded(true)}
+          type="button"
+        >
+          + {hidden} más
+        </button>
+      )}
+    </div>
+  );
+}
+
+function InlineSubscriptionAudit({ audit }) {
+  if (!audit || !audit.items?.length) return null;
+  const { items, totalMonthly, totalAnnual } = audit;
+  return (
+    <div className="inline-audit">
+      <p className="chart-title">Auditoría de suscripciones</p>
+      <div className="audit-totals">
+        <div className="audit-total">
+          <span className="audit-total-label">Mensual</span>
+          <span className="audit-total-value">{fmtMXN(totalMonthly)}</span>
+        </div>
+        <div className="audit-total">
+          <span className="audit-total-label">Anual</span>
+          <span className="audit-total-value strong">{fmtMXN(totalAnnual)}</span>
+        </div>
+      </div>
+      <div className="audit-list">
+        {items.map((it, i) => (
+          <div key={i} className="audit-row">
+            <div className="audit-desc">{it.descripcion}</div>
+            <div className="audit-monthly">{fmtMXN(it.monthly)}/mes</div>
+            <div className="audit-annual">{fmtMXN(it.annual)}/año</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InlineStreak({ streak }) {
+  if (!streak) return null;
+  const { label, current, unit = "días", best, icon, context } = streak;
+  return (
+    <div className="inline-streak">
+      <div className="streak-left">
+        <div className="streak-icon">{icon || "🔥"}</div>
+        <div className="streak-value-block">
+          <div className="streak-value">{current}</div>
+          <div className="streak-unit">{unit}</div>
+        </div>
+      </div>
+      <div className="streak-body">
+        <div className="streak-label">{label}</div>
+        {context ? (
+          <div className="streak-context">{context}</div>
+        ) : best !== undefined ? (
+          <div className="streak-context">Récord: {best} {unit}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function InlineCompare({ compare }) {
+  if (!compare) return null;
+  const { title, leftLabel, rightLabel, rows } = compare;
+  return (
+    <div className="inline-compare">
+      <p className="chart-title">{title}</p>
+      <div className="compare-header">
+        <div className="compare-spacer" />
+        <div className="compare-col-label">{leftLabel}</div>
+        <div className="compare-col-label">{rightLabel}</div>
+        <div className="compare-delta-label">Δ</div>
+      </div>
+      {rows.map((r, i) => {
+        const diff = r.right - r.left;
+        const pct = r.left !== 0 ? (diff / Math.abs(r.left)) * 100 : 0;
+        const positive = diff >= 0;
+        return (
+          <div key={i} className="compare-row">
+            <div className="compare-row-label">{r.label}</div>
+            <div className="compare-cell">{fmtMXN(r.left)}</div>
+            <div className="compare-cell strong">{fmtMXN(r.right)}</div>
+            <div className={`compare-delta ${positive ? "up" : "down"}`}>
+              {positive ? "▲" : "▼"} {Math.abs(pct).toFixed(0)}%
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function InlineSimulator({ simulator }) {
@@ -95,7 +256,31 @@ function InlineSimulator({ simulator }) {
             ? fmtMXN(output.primary.value)
             : `${output.primary.value} ${output.primary.unit || ""}`.trim()}
         </div>
+        {output.secondary && (
+          <div className="sim-secondary">
+            {output.secondary.map((s, i) => (
+              <div key={i} className="sim-secondary-row">
+                <span className="sim-secondary-label">{s.label}</span>
+                <span className="sim-secondary-value">{fmtMXN(s.value)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+      {output.chart && output.chart.length > 1 && (
+        <div className="sim-chart">
+          <ResponsiveContainer width="100%" height={140}>
+            <LineChart data={output.chart} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+              <YAxis tick={{ fontSize: 9 }} width={42}
+                tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} />
+              <Tooltip formatter={(v) => fmtMXN(v)} />
+              <Line type="monotone" dataKey="value" stroke="#cc0000" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
       {metaImpact && (
         <div className="sim-meta">
           <div className="sim-meta-label">{metaImpact.name}</div>
@@ -155,6 +340,28 @@ function InlineChart({ chart }) {
             <Bar dataKey="value" name="Este mes" fill="#cc0000" radius={[3, 3, 0, 0]} />
             {hasSecond && <Bar dataKey="value2" name="Mes anterior" fill="#bbb" radius={[3, 3, 0, 0]} />}
           </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  if (type === "line") {
+    const reference = chart.reference;
+    return (
+      <div className="inline-chart">
+        <p className="chart-title">{title}</p>
+        <ResponsiveContainer width="100%" height={210}>
+          <LineChart data={data} margin={{ top: 4, right: 8, bottom: 28, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" interval={Math.ceil(data.length / 8)} />
+            <YAxis tick={{ fontSize: 9 }} width={42}
+              tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} />
+            <Tooltip formatter={(v) => fmtMXN(v)} />
+            {reference && typeof reference.value === "number" && (
+              <ReferenceLine y={reference.value} stroke="#999" strokeDasharray="4 4" label={{ value: reference.label || "", fontSize: 9, fill: "#777" }} />
+            )}
+            <Line type="monotone" dataKey="value" stroke="#cc0000" strokeWidth={2} dot={{ r: 2, fill: "#cc0000" }} activeDot={{ r: 4 }} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
     );
@@ -422,6 +629,24 @@ export default function Chatbot() {
     if (!open) fetchHealthScore();
   }, [open, fetchHealthScore]);
 
+  const insightsFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!open || !session || !accepted || insightsFetchedRef.current) return;
+    insightsFetchedRef.current = true;
+    fetch("/api/insights", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data?.insights?.length) return;
+        setExtraMessages((prev) => [
+          { role: "bot", insights: data.insights, text: "" },
+          ...prev,
+        ]);
+      })
+      .catch(() => {});
+  }, [open, session, accepted]);
+
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -646,14 +871,14 @@ export default function Chatbot() {
         return next;
       });
     };
-    tw.onDone = ({ reply, chart, simulator, actions = [], tarjetas = [] }) => {
+    tw.onDone = ({ reply, chart, simulator, streak, compare, subscriptionAudit, actions = [], tarjetas = [] }) => {
       if (tarjetas.length > 0) setUserTarjetas(tarjetas);
       setMessages((prev) => {
         if (!prev.length) return prev;
         const next = [...prev];
         const last = next.length - 1;
         if (next[last]?.role === "bot") {
-          next[last] = { ...next[last], text: reply, chart, simulator, actions };
+          next[last] = { ...next[last], text: reply, chart, simulator, streak, compare, subscriptionAudit, actions };
         }
         return next;
       });
@@ -888,7 +1113,7 @@ export default function Chatbot() {
             {messages.map((msg, i) => {
               const isLast = i === messages.length - 1;
               const isStreamingThis = streaming && isLast && msg.role === "bot";
-              if (msg.role === "bot" && !msg.text && !msg.chart && !msg.simulator && !(msg.actions?.length)) {
+              if (msg.role === "bot" && !msg.text && !msg.chart && !msg.simulator && !msg.streak && !msg.compare && !msg.subscriptionAudit && !msg.insights && !(msg.actions?.length)) {
                 return null;
               }
               return (
@@ -896,7 +1121,11 @@ export default function Chatbot() {
                   {msg.role === "bot" ? (
                     <>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                      <InlineInsights insights={msg.insights} />
                       <InlineChart chart={msg.chart} />
+                      <InlineStreak streak={msg.streak} />
+                      <InlineCompare compare={msg.compare} />
+                      <InlineSubscriptionAudit audit={msg.subscriptionAudit} />
                       {msg.simulator && <InlineSimulator simulator={msg.simulator} />}
                       {msg.actions && msg.actions.length > 0 && isLast && (
                         <ActionChips
