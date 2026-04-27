@@ -13,6 +13,7 @@ const presupuestosRoutes = require('./routes/presupuestos');
 const recurrenciasRoutes = require('./routes/recurrencias');
 const chatbotRoutes = require('./routes/chatbot');
 const healthRoutes = require('./routes/health');
+const configRoutes = require('./routes/config');
 const authMiddleware = require('./middleware/auth');
 require('dotenv').config();
 
@@ -26,19 +27,23 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  }
+  origin: [
+    'https://financesmart1-ov6t3f243-neonalex117s-projects.vercel.app', // Tu URL de Vercel
+    'http://localhost:5173' // Para que sigas pudiendo probar local
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json());
+
+const isDev = process.env.NODE_ENV !== 'production';
 
 const generalLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDev,
   message: { error: 'Demasiadas solicitudes, intenta más tarde.' }
 });
 
@@ -47,6 +52,7 @@ const chatbotLimit = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDev,
   message: { error: 'Límite de mensajes alcanzado, espera un momento.' }
 });
 
@@ -68,5 +74,6 @@ app.use('/api/presupuestos', authMiddleware, presupuestosRoutes);
 app.use('/api/recurrencias', authMiddleware, recurrenciasRoutes);
 app.use('/api/chatbot', chatbotLimit, authMiddleware, chatbotRoutes);
 app.use('/api/health', authMiddleware, healthRoutes);
+app.use('/api/config', configRoutes);
 
 module.exports = app;

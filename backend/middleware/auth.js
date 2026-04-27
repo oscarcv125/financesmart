@@ -11,15 +11,19 @@ module.exports = async function authMiddleware(req, res, next) {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 
-  let { data: usuario, error: dbError } = await supabase
+  let { data: usuarios, error: dbError } = await supabase
     .from('usuario')
     .select('*')
     .eq('email', user.email)
-    .maybeSingle();
+    .order('id_usuario', { ascending: true })
+    .limit(1);
 
   if (dbError) {
+    console.error('[auth] dbError consultando usuario:', dbError);
     return res.status(500).json({ error: 'Error consultando usuario' });
   }
+
+  let usuario = usuarios?.[0] || null;
 
   if (!usuario) {
     const meta = user.user_metadata || {};

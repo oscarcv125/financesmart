@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
 import "../styles/analisisfinanciero.css";
+import { BACKEND_URL } from "../config";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, PieChart, Pie,
@@ -19,7 +20,7 @@ export default function AnalisisFinanciero() {
   useEffect(() => {
     if (!session) return;
     setLoading(true);
-    fetch(`/api/analisis/resumen?periodo=${activeTab}`, {
+    fetch(`${BACKEND_URL}/api/analisis/resumen?periodo=${activeTab}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(res => res.json())

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseserver');
+const aiProvider = require('../utils/aiProvider');
 
 function monthBounds(offsetMonths = 0) {
   const now = new Date();
@@ -139,22 +140,20 @@ function calculateForecast(data) {
   const now = new Date();
   const today = now.getDate();
   const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  
+
   const daysPassed = Math.max(1, today);
   const daysRemaining = totalDays - today;
-  
-  // Daily average based on current month spend
+
   const dailyAvg = data.gastos / daysPassed;
   const projectedVariable = dailyAvg * daysRemaining;
-  
-  // Fixed costs remaining (upcoming recurrences)
+
   const upcomingRecurrencias = (data.recurrenciasRaw || [])
     .filter(r => r.dia_del_mes > today)
     .reduce((acc, r) => acc + Math.abs(Number(r.monto)), 0);
-    
+
   const totalProjected = data.gastos + projectedVariable + upcomingRecurrencias;
-  const vsBudget = data.presupuestoTotal > 0 
-    ? Math.round((totalProjected / data.presupuestoTotal) * 100) 
+  const vsBudget = data.presupuestoTotal > 0
+    ? Math.round((totalProjected / data.presupuestoTotal) * 100)
     : 0;
 
   return {
@@ -167,24 +166,21 @@ function calculateForecast(data) {
   };
 }
 
-// Generates contextual action suggestions for coach mode based on real financial data
 function suggestCoachActions(data) {
   const actions = [];
   const { metasRaw, tarjetasRaw, saldo } = data;
 
-  // Need at least one tarjeta to make contributions
   if (tarjetasRaw.length > 0) {
     const incompletas = metasRaw
       .filter(m => Number(m.progreso) < Number(m.monto_objetivo))
       .sort((a, b) => {
         const pa = a.monto_objetivo > 0 ? a.progreso / a.monto_objetivo : 0;
         const pb = b.monto_objetivo > 0 ? b.progreso / b.monto_objetivo : 0;
-        return pb - pa; // closest to completion first
+        return pb - pa;
       });
 
     for (const meta of incompletas.slice(0, 2)) {
       const faltante = Number(meta.monto_objetivo) - Number(meta.progreso);
-      // Suggest ~10% of remaining, rounded up to nearest $50, min $50
       let sugerido = Math.ceil((faltante * 0.1) / 50) * 50;
       sugerido = Math.max(50, Math.min(sugerido, faltante));
 
@@ -198,7 +194,6 @@ function suggestCoachActions(data) {
     }
   }
 
-  // Suggest creating a goal if none exist and there's a positive balance
   if (metasRaw.length === 0 && saldo > 0) {
     actions.push({
       type: 'nav',
@@ -227,6 +222,44 @@ function extractChart(text) {
     return { text: cleanText, chart: raw };
   } catch {
     return { text: cleanText, chart: null };
+  }
+}
+
+const SIMULATOR_RE = /\[SIMULATOR\]\s*([\s\S]*?)\s*\[\/SIMULATOR\]/;
+const VALID_SIM_TYPES = new Set(['savings_daily', 'category_reduction', 'goal_acceleration']);
+
+function extractSimulator(text) {
+  const match = text.match(SIMULATOR_RE);
+  if (!match) return { text, simulator: null };
+
+  const cleanText = text.replace(SIMULATOR_RE, '').trim();
+  try {
+    const raw = JSON.parse(match[1].trim());
+    if (!VALID_SIM_TYPES.has(raw.type)) return { text: cleanText, simulator: null };
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, simulator: null };
+    if (!Array.isArray(raw.params) || raw.params.length === 0 || raw.params.length > 5) {
+      return { text: cleanText, simulator: null };
+    }
+    const validParams = raw.params.every(p =>
+      typeof p?.key === 'string' &&
+      typeof p?.label === 'string' &&
+      typeof p?.value === 'number' &&
+      typeof p?.min === 'number' &&
+      typeof p?.max === 'number' &&
+      typeof p?.step === 'number' &&
+      p.max > p.min &&
+      p.value >= p.min && p.value <= p.max
+    );
+    if (!validParams) return { text: cleanText, simulator: null };
+    if (raw.meta) {
+      const m = raw.meta;
+      if (typeof m.name !== 'string' || typeof m.target !== 'number' || typeof m.progress !== 'number') {
+        delete raw.meta;
+      }
+    }
+    return { text: cleanText, simulator: raw };
+  } catch {
+    return { text: cleanText, simulator: null };
   }
 }
 
@@ -278,7 +311,52 @@ Cuando tu respuesta muestre un desglose, comparación o distribución de datos f
 [/CHART]
 Tipos válidos: "pie" (distribuciones/desgloses), "bar" (comparaciones entre periodos o categorías).
 Para barras con dos series usa "value" y "value2". Máx 7 elementos. Nombres máx 12 caracteres. JSON en una sola línea.
-NO incluyas gráfica para saludos, consejos generales o preguntas simples de saldo.`;
+NO incluyas gráfica para saludos, consejos generales o preguntas simples de saldo.
+
+=== INSTRUCCIÓN DE SIMULADORES INTERACTIVOS ===
+Cuando el usuario pregunte "qué pasaría si...", "y si ahorro X al día", "cuánto se acumularía...", o cuando ofrecer una simulación sea útil para coaching, añade AL FINAL de tu respuesta UN bloque con este formato exacto:
+[SIMULATOR]
+{"type":"savings_daily","title":"Si ahorras todos los días","params":[{"key":"amount","label":"$ al día","value":150,"min":20,"max":500,"step":10,"unit":"MXN"},{"key":"days","label":"Días","value":30,"min":7,"max":90,"step":1}],"meta":{"name":"Viaje a Japón","target":35000,"progress":8200}}
+[/SIMULATOR]
+
+Tipos válidos y ESTRUCTURA OBLIGATORIA de params (orden y keys EXACTAS):
+- "savings_daily": [{key:"amount",unit:"MXN"},{key:"days"}]. Output = amount × days.
+- "category_reduction": [{key:"currentMonthly",unit:"MXN"},{key:"reductionPct",unit:"%"},{key:"months"}]. Output = currentMonthly × (reductionPct/100) × months.
+- "goal_acceleration": [{key:"extraPerMonth",unit:"MXN"}]. Requiere "meta". Output = meses para completar.
+
+REGLAS DE RANGOS REALISTAS (obligatorio — sliders deben sentirse útiles):
+- "amount" (MXN/día): min entre 10-50, max entre 300-800, step 5 o 10. NUNCA max > 1000.
+- "days": min 7, max 90, step 1.
+- "currentMonthly" (MXN/mes): min 200, max ≤ 1.5 × gasto real del usuario en esa categoría, step 50.
+- "reductionPct" (%): min 5, max 60, step 5.
+- "months": min 1, max 12, step 1.
+- "extraPerMonth" (MXN/mes): min 100, max 5000, step 50.
+
+OTRAS REGLAS:
+- "params" array, en el ORDEN exacto listado arriba para cada tipo.
+- "value" (default): SI EL USUARIO MENCIONA NÚMEROS ESPECÍFICOS en su pregunta, úsalos directamente como "value".
+  Ejemplos:
+  · "qué pasa si ahorro 200 al día" → amount.value=200, days.value=30 (default).
+  · "200 al día por 40 días" → amount.value=200, days.value=40.
+  · "y si lo hago por 60 días" → days.value=60, amount.value=default razonable (ej. 100-200).
+  · "si reduzco 30% en restaurantes 3 meses" → reductionPct.value=30, months.value=3.
+  Si NO menciona números, elige defaults razonables basados en el contexto financiero del usuario.
+  Ajusta min/max si fuera necesario para que el "value" caiga dentro del rango (ej. si el usuario dice 800, ajusta amount.max a 1000).
+- "meta" (opcional): {name, target, progress} con valores REALES tomados del contexto del usuario.
+  · Si el usuario menciona una meta específica (ej. "para mi viaje", "para el iPhone"), usa ESA meta.
+  · Si no menciona ninguna pero la simulación se relaciona con metas, elige la más PERTINENTE: la que el aporte simulado podría completar más rápido, o la más cercana a su monto objetivo. Varía entre las metas reales del usuario; NO copies el ejemplo del schema.
+  · Si la simulación no se relaciona con metas, omite "meta".
+- JSON en UNA SOLA línea (sin saltos de línea internos).
+- Emite UN SOLO bloque por respuesta: CHART o SIMULATOR, nunca ambos.
+- NO incluyas SIMULATOR para preguntas que no involucren proyección.`;
+
+  const brevityRules = `
+=== REGLAS DE BREVEDAD (OBLIGATORIO) ===
+- Responde en MÁXIMO 120 palabras. Sé directo y específico.
+- Usa máximo 3 bullets cortos cuando hagas listas.
+- NO repitas datos del contexto a menos que sean esenciales para la respuesta.
+- NO incluyas frases motivacionales largas, despedidas elaboradas, ni preguntas de seguimiento.
+- Si el usuario quiere más detalle, lo pedirá.`;
 
   if (mode === 'analyst') {
     return `Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario ${nombre}.
@@ -286,15 +364,29 @@ Responde SIEMPRE en español, de forma objetiva, precisa y profesional.
 No des consejos no solicitados a menos que el usuario los pida explícitamente.
 Mantén un tono neutro. No inventes datos fuera del contexto financiero proporcionado.
 Si el usuario no ha enviado mensajes aún (primera interacción), proporciona un resumen financiero breve y objetivo: saldo, variación vs mes anterior, presupuestos cerca del límite o excedidos, y metas con progreso destacable. Sin opiniones.
+${brevityRules}
 ${contexto}${chartInstructions}`;
   }
 
   return `Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario ${nombre}.
-Responde SIEMPRE en español, de forma motivadora y cercana.
+Responde SIEMPRE en español, de forma motivadora y cercana, pero CONCISA.
 Usa los datos financieros reales del usuario para proponer acciones concretas y alcanzables.
 Relaciona siempre tus consejos con sus metas de ahorro, sus presupuestos y sus cargos recurrentes.
 No inventes datos fuera del contexto financiero proporcionado.
+${brevityRules}
 ${contexto}${chartInstructions}`;
+}
+
+const TERMINATOR_MARKERS = ['[CHART]', '[SIMULATOR]'];
+const SAFE_BUFFER = Math.max(...TERMINATOR_MARKERS.map(m => m.length)) - 1;
+
+function findEarliestMarker(text) {
+  let earliest = -1;
+  for (const m of TERMINATOR_MARKERS) {
+    const idx = text.indexOf(m);
+    if (idx !== -1 && (earliest === -1 || idx < earliest)) earliest = idx;
+  }
+  return earliest;
 }
 
 router.post('/', async (req, res) => {
@@ -310,45 +402,86 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Historial inválido' });
   }
 
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const send = (type, payload = {}) => {
+    res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+  };
+
+  const abort = new AbortController();
+  req.on('close', () => abort.abort());
+
   try {
     const nombre = `${req.usuario.nombre} ${req.usuario.apellido}`;
     const financialData = await fetchUserFinancialData(req.usuario.id_usuario);
     financialData.forecast = calculateForecast(financialData);
     const systemPrompt = buildSystemPrompt(mode, nombre, financialData);
 
-    const newHistory = [...history, { role: 'user', parts: [{ text: message }] }];
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: newHistory,
-        }),
-      }
-    );
-
-    if (!geminiRes.ok) {
-      throw new Error(`Gemini error: ${geminiRes.status}`);
+    if (typeof aiProvider.generateStream !== 'function') {
+      throw new Error(`Proveedor ${aiProvider.name} no soporta streaming`);
     }
 
-    const geminiData = await geminiRes.json();
-    const rawReply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
-    const { text: reply, chart } = extractChart(rawReply);
+    let fullText = '';
+    let emittedUpTo = 0;
+    let blockCutoff = -1;
 
-    const actions = mode === 'coach' ? suggestCoachActions(financialData) : [];
+    for await (const chunk of aiProvider.generateStream({
+      systemPrompt, history, message, signal: abort.signal,
+    })) {
+      if (res.writableEnded || abort.signal.aborted) break;
+      fullText += chunk;
+
+      if (blockCutoff === -1) {
+        const idx = findEarliestMarker(fullText);
+        if (idx !== -1) {
+          const toEmit = fullText.slice(emittedUpTo, idx);
+          if (toEmit) send('delta', { text: toEmit });
+          blockCutoff = idx;
+          emittedUpTo = idx;
+        } else {
+          const safe = Math.max(emittedUpTo, fullText.length - SAFE_BUFFER);
+          if (safe > emittedUpTo) {
+            send('delta', { text: fullText.slice(emittedUpTo, safe) });
+            emittedUpTo = safe;
+          }
+        }
+      }
+    }
+
+    if (blockCutoff === -1 && emittedUpTo < fullText.length) {
+      send('delta', { text: fullText.slice(emittedUpTo) });
+    }
+
+    const afterChart = extractChart(fullText);
+    const afterSim = extractSimulator(afterChart.text);
+    const reply = afterSim.text;
+    const chart = afterChart.chart;
+    const simulator = afterSim.simulator;
+
+    const SAVINGS_INTENT_RE = /ahorr|meta|aport|guardar|fondo|inversi|presupuest|alcanza|object/i;
+    const showActions = mode === 'coach' && SAVINGS_INTENT_RE.test(message);
+    const actions = showActions ? suggestCoachActions(financialData) : [];
     const tarjetas = mode === 'coach'
       ? financialData.tarjetasRaw.map(t => ({ id: t.id_tarjeta, nombre: t.nombre }))
       : [];
 
-    res.json({ reply, chart, actions, tarjetas });
+    send('done', { reply, chart, simulator, actions, tarjetas, provider: aiProvider.name });
+    res.end();
   } catch (error) {
-    console.error('Error en chatbot:', error.message);
-    res.status(500).json({ error: 'Error al procesar la consulta' });
+    if (!abort.signal.aborted) {
+      console.error(`Error en chatbot (${aiProvider.name}):`, error.message);
+    }
+    if (!res.writableEnded) {
+      send('error', { error: 'Error al procesar la consulta' });
+      res.end();
+    }
   }
 });
 
 module.exports = router;
 module.exports.extractChart = extractChart;
+module.exports.extractSimulator = extractSimulator;

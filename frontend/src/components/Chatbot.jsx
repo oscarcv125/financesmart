@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -11,8 +12,110 @@ import "../styles/chatbot.css";
 
 const CHART_PALETTE = ["#cc0000", "#2196f3", "#4caf50", "#ff9800", "#9c27b0", "#00bcd4", "#ff5722", "#795548"];
 
+const TW_DEFAULT_INTERVAL_MS = 18;
+const TW_DEFAULT_BASE_STEP = 2;
+
 function fmtMXN(v) {
   return `$${Number(v).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+function computeSimulatorOutput(type, values, params, meta) {
+  const get = (i) => Number(values[params[i]?.key] ?? 0);
+  switch (type) {
+    case "savings_daily": {
+      const total = get(0) * get(1);
+      return { primary: { label: "Total ahorrado", value: total } };
+    }
+    case "category_reduction": {
+      const total = get(0) * (get(1) / 100) * get(2);
+      return { primary: { label: "Total ahorrado", value: total } };
+    }
+    case "goal_acceleration": {
+      if (!meta || !meta.target) return { primary: { label: "Meses para completar", value: 0 } };
+      const faltante = Math.max(0, meta.target - (meta.progress || 0));
+      const monthly = get(0);
+      const months = monthly > 0 ? Math.ceil(faltante / monthly) : Infinity;
+      return {
+        primary: {
+          label: "Meses para completar",
+          value: Number.isFinite(months) ? months : 0,
+          unit: Number.isFinite(months) ? "meses" : "—",
+        },
+      };
+    }
+    default:
+      return { primary: { label: "—", value: 0 } };
+  }
+}
+
+function InlineSimulator({ simulator }) {
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(simulator.params.map((p) => [p.key, p.value]))
+  );
+
+  const { type, title, params, meta } = simulator;
+  const output = computeSimulatorOutput(type, values, params, meta);
+  const isMoney = type !== "goal_acceleration";
+
+  let metaImpact = null;
+  if (meta && type !== "goal_acceleration") {
+    const before = meta.target > 0 ? Math.min(100, Math.round((meta.progress / meta.target) * 100)) : 0;
+    const after = meta.target > 0 ? Math.min(100, Math.round(((meta.progress + output.primary.value) / meta.target) * 100)) : 0;
+    metaImpact = { name: meta.name, before, after };
+  }
+
+  return (
+    <div className="inline-sim">
+      <p className="sim-title">{title}</p>
+      {params.map((p) => (
+        <div key={p.key} className="sim-param">
+          <div className="sim-param-row">
+            <span className="sim-param-label">{p.label}</span>
+            <span className="sim-param-value">
+              {p.unit === "MXN" ? fmtMXN(values[p.key]) : values[p.key]}
+              {p.unit && p.unit !== "MXN" ? ` ${p.unit}` : ""}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={p.min}
+            max={p.max}
+            step={p.step}
+            value={values[p.key]}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, [p.key]: Number(e.target.value) }))
+            }
+          />
+        </div>
+      ))}
+      <div className="sim-output">
+        <div className="sim-output-label">{output.primary.label}</div>
+        <div className="sim-output-value">
+          {isMoney
+            ? fmtMXN(output.primary.value)
+            : `${output.primary.value} ${output.primary.unit || ""}`.trim()}
+        </div>
+      </div>
+      {metaImpact && (
+        <div className="sim-meta">
+          <div className="sim-meta-label">{metaImpact.name}</div>
+          <div className="sim-meta-bar">
+            <div className="sim-meta-bar-before" style={{ width: `${metaImpact.before}%` }} />
+            <div
+              className="sim-meta-bar-delta"
+              style={{
+                left: `${metaImpact.before}%`,
+                width: `${Math.max(0, metaImpact.after - metaImpact.before)}%`,
+              }}
+            />
+          </div>
+          <div className="sim-meta-pct">
+            {metaImpact.before}% → <strong>{metaImpact.after}%</strong>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function InlineChart({ chart }) {
@@ -155,6 +258,39 @@ const buildMsgBienvenida = (nombre, mode) => ({
     : `¡Hola, ${nombre.split(" ")[0]}! 👋 Soy tu Coach Financiero. Estoy aquí para ayudarte a alcanzar tus metas y mejorar tus hábitos financieros. ¿Por dónde empezamos?`,
 });
 
+async function readChatbotStream(res, { onDelta, onDone, onError, signal }) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  try {
+    while (true) {
+      if (signal?.aborted) break;
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      let sep;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        const block = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        for (const line of block.split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          const payload = line.slice(5).trim();
+          if (!payload) continue;
+          let evt;
+          try { evt = JSON.parse(payload); } catch { continue; }
+          if (evt.type === "delta" && evt.text) onDelta?.(evt.text);
+          else if (evt.type === "done") onDone?.(evt);
+          else if (evt.type === "error") onError?.(evt.error || "Error del servidor");
+        }
+      }
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* */ }
+  }
+}
+
 export default function Chatbot() {
   const { session } = useAuth();
   const navigate = useNavigate();
@@ -186,11 +322,6 @@ export default function Chatbot() {
 
   useEffect(() => { fetchHealthScore(); }, [fetchHealthScore]);
 
-  // Refresh score when chat closes (contributions or other actions may have changed data)
-  useEffect(() => {
-    if (!open) fetchHealthScore();
-  }, [open, fetchHealthScore]);
-
   const [open, setOpen]               = useState(false);
   const [input, setInput]             = useState("");
   const [loading, setLoading]         = useState(false);
@@ -211,6 +342,85 @@ export default function Chatbot() {
   const analysisTriggered = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const [showHealthTip, setShowHealthTip] = useState(false);
+  const healthTipTimer = useRef(null);
+  const [streaming, setStreaming] = useState(false);
+  const streamAbortRef = useRef(null);
+  const twConfigRef = useRef({
+    intervalMs: TW_DEFAULT_INTERVAL_MS,
+    charsPerTick: TW_DEFAULT_BASE_STEP,
+  });
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cancelled || !cfg?.typewriter) return;
+        const tw = cfg.typewriter;
+        twConfigRef.current = {
+          intervalMs: tw.intervalMs || TW_DEFAULT_INTERVAL_MS,
+          charsPerTick: tw.charsPerTick || TW_DEFAULT_BASE_STEP,
+        };
+      })
+      .catch(() => { /* */ });
+    return () => { cancelled = true; };
+  }, []);
+  const typewriterRef = useRef({
+    target: "",        // accumulated text from server
+    displayed: 0,      // chars already rendered
+    doneData: null,    // {reply, chart, actions, tarjetas} when stream completes
+    onTick: null,      // (text) => void  — applies displayed text to a message
+    onDone: null,      // ({reply, chart, actions}) => void — finalize
+    intervalId: null,
+  });
+
+  const stopTypewriter = useCallback(() => {
+    const t = typewriterRef.current;
+    if (t.intervalId) clearInterval(t.intervalId);
+    t.intervalId = null;
+  }, []);
+
+  const startTypewriter = useCallback(() => {
+    const t = typewriterRef.current;
+    if (t.intervalId) return;
+    const cfg = twConfigRef.current;
+    t.intervalId = setInterval(() => {
+      const remaining = t.target.length - t.displayed;
+      if (remaining > 0) {
+        t.displayed = Math.min(t.target.length, t.displayed + cfg.charsPerTick);
+        t.onTick?.(t.target.slice(0, t.displayed));
+      } else if (t.doneData) {
+        const data = t.doneData;
+        t.doneData = null;
+        stopTypewriter();
+        t.onDone?.(data);
+      }
+    }, cfg.intervalMs);
+  }, [stopTypewriter]);
+
+  const resetTypewriter = useCallback(() => {
+    stopTypewriter();
+    const t = typewriterRef.current;
+    t.target = "";
+    t.displayed = 0;
+    t.doneData = null;
+    t.onTick = null;
+    t.onDone = null;
+  }, [stopTypewriter]);
+
+  const showHealthTooltip = useCallback(() => {
+    if (healthTipTimer.current) clearTimeout(healthTipTimer.current);
+    setShowHealthTip(true);
+  }, []);
+  const hideHealthTooltip = useCallback(() => {
+    if (healthTipTimer.current) clearTimeout(healthTipTimer.current);
+    healthTipTimer.current = setTimeout(() => setShowHealthTip(false), 180);
+  }, []);
+
+  // Refresh score when chat closes (contributions or other actions may have changed data)
+  useEffect(() => {
+    if (!open) fetchHealthScore();
+  }, [open, fetchHealthScore]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -267,30 +477,60 @@ export default function Chatbot() {
     if (analysisTriggered.current) return;
     analysisTriggered.current = true;
 
+    const analystPrompt = "Proporciona un análisis financiero objetivo y breve de mi situación actual.";
+    const ctrl = new AbortController();
+    streamAbortRef.current = ctrl;
     setLoading(true);
+    setStreaming(true);
+
+    setExtraMessages((prev) => [...prev, { role: "bot", text: "" }]);
+
     fetch("/api/chatbot", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        message: "Proporciona un análisis financiero objetivo y breve de mi situación actual.",
-        history: [],
-        mode: "analyst",
-      }),
+      body: JSON.stringify({ message: analystPrompt, history: [], mode: "analyst" }),
+      signal: ctrl.signal,
     })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.reply) return;
-        setHistory([
-          { role: "user", parts: [{ text: "Proporciona un análisis financiero objetivo y breve de mi situación actual." }] },
-          { role: "model", parts: [{ text: data.reply }] },
-        ]);
-        setExtraMessages([{ role: "bot", text: data.reply, chart: data.chart }]);
+      .then(async (res) => {
+        if (!res.ok || !res.body) throw new Error("Error del servidor");
+        await readChatbotStream(res, {
+          signal: ctrl.signal,
+          onDelta: (text) => {
+            setLoading(false);
+            setExtraMessages((prev) => {
+              const next = [...prev];
+              const last = next.length - 1;
+              if (last < 0 || next[last]?.role !== "bot") return prev;
+              next[last] = { ...next[last], text: (next[last].text || "") + text };
+              return next;
+            });
+          },
+          onDone: ({ reply, chart }) => {
+            setHistory([
+              { role: "user", parts: [{ text: analystPrompt }] },
+              { role: "model", parts: [{ text: reply }] },
+            ]);
+            setExtraMessages((prev) => {
+              if (!prev.length) return [{ role: "bot", text: reply, chart }];
+              const next = [...prev];
+              const last = next.length - 1;
+              next[last] = { ...next[last], text: reply, chart };
+              return next;
+            });
+          },
+        });
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => { /* */ })
+      .finally(() => {
+        setLoading(false);
+        setStreaming(false);
+        if (streamAbortRef.current === ctrl) streamAbortRef.current = null;
+      });
+
+    return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, mode, accepted, session]);
 
@@ -380,10 +620,51 @@ export default function Chatbot() {
 
   const sendMessage = async (text) => {
     const msg = (text || input).trim();
-    if (!msg || loading) return;
+    if (!msg || loading || streaming) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", text: msg }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: msg },
+      { role: "bot", text: "" },
+    ]);
     setLoading(true);
+    setStreaming(true);
+
+    const ctrl = new AbortController();
+    streamAbortRef.current = ctrl;
+    let streamedSomething = false;
+
+    const tw = typewriterRef.current;
+    resetTypewriter();
+    tw.onTick = (rendered) => {
+      setLoading(false);
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next.length - 1;
+        if (last < 0 || next[last]?.role !== "bot") return prev;
+        next[last] = { ...next[last], text: rendered };
+        return next;
+      });
+    };
+    tw.onDone = ({ reply, chart, simulator, actions = [], tarjetas = [] }) => {
+      if (tarjetas.length > 0) setUserTarjetas(tarjetas);
+      setMessages((prev) => {
+        if (!prev.length) return prev;
+        const next = [...prev];
+        const last = next.length - 1;
+        if (next[last]?.role === "bot") {
+          next[last] = { ...next[last], text: reply, chart, simulator, actions };
+        }
+        return next;
+      });
+      setHistory((prev) => [
+        ...prev,
+        { role: "user", parts: [{ text: msg }] },
+        { role: "model", parts: [{ text: reply }] },
+      ]);
+      setStreaming(false);
+      if (streamAbortRef.current === ctrl) streamAbortRef.current = null;
+    };
 
     try {
       const res = await fetch("/api/chatbot", {
@@ -393,27 +674,62 @@ export default function Chatbot() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ message: msg, history, mode }),
+        signal: ctrl.signal,
       });
+      if (!res.ok || !res.body) throw new Error("Error del servidor");
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error del servidor");
-
-      const { reply, chart, actions = [], tarjetas = [] } = data;
-      if (tarjetas.length > 0) setUserTarjetas(tarjetas);
-      setHistory((prev) => [
-        ...prev,
-        { role: "user", parts: [{ text: msg }] },
-        { role: "model", parts: [{ text: reply }] },
-      ]);
-      setMessages((prev) => [...prev, { role: "bot", text: reply, chart, actions }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "bot", text: "Error de conexión. Intenta de nuevo." },
-      ]);
+      await readChatbotStream(res, {
+        signal: ctrl.signal,
+        onDelta: (chunk) => {
+          streamedSomething = true;
+          tw.target += chunk;
+          startTypewriter();
+        },
+        onDone: (doneData) => {
+          tw.target = doneData.reply || tw.target;
+          tw.doneData = doneData;
+          startTypewriter();
+        },
+        onError: () => { throw new Error("stream-error"); },
+      });
+    } catch (err) {
+      stopTypewriter();
+      if (err?.name === "AbortError") {
+        setStreaming(false);
+        if (streamAbortRef.current === ctrl) streamAbortRef.current = null;
+      } else if (!streamedSomething) {
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next.length - 1;
+          if (last >= 0 && next[last]?.role === "bot" && !next[last].text) {
+            next[last] = { ...next[last], text: "Error de conexión. Intenta de nuevo." };
+            return next;
+          }
+          return [...prev, { role: "bot", text: "Error de conexión. Intenta de nuevo." }];
+        });
+        setStreaming(false);
+        if (streamAbortRef.current === ctrl) streamAbortRef.current = null;
+      } else {
+        setStreaming(false);
+        if (streamAbortRef.current === ctrl) streamAbortRef.current = null;
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const cancelStream = () => {
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
+    const t = typewriterRef.current;
+    if (t.target.length > t.displayed) {
+      t.displayed = t.target.length;
+      t.onTick?.(t.target);
+    }
+    stopTypewriter();
+    setStreaming(false);
   };
 
   const handleAportarAction = async (action, tarjetaId) => {
@@ -477,6 +793,11 @@ export default function Chatbot() {
                   <span
                     className="header-score"
                     style={{ color: SCORE_COLORS[healthScore.color] }}
+                    tabIndex={0}
+                    onMouseEnter={showHealthTooltip}
+                    onMouseLeave={hideHealthTooltip}
+                    onFocus={showHealthTooltip}
+                    onBlur={hideHealthTooltip}
                   >
                     {" "}· {healthScore.score}/100 {healthScore.grade}
                   </span>
@@ -490,6 +811,34 @@ export default function Chatbot() {
               </button>
               <button className="chat-icon-btn" onClick={() => { setOpen(false); setFullscreen(false); setShowSettings(false); setPos({ x: null, y: null }); setSize({ w: 370, h: 520 }); }}>✕</button>
             </div>
+            {healthScore !== null && showHealthTip && (
+              <div
+                className="health-tooltip"
+                role="tooltip"
+                onMouseEnter={showHealthTooltip}
+                onMouseLeave={hideHealthTooltip}
+              >
+                <div className="health-tooltip-title">Salud Financiera</div>
+                <div className="health-tooltip-desc">
+                  Puntaje 0-100 calculado sobre tu mes actual.
+                </div>
+                <div className="health-tooltip-row">
+                  <span className="health-tooltip-label">Ahorro</span>
+                  <span className="health-tooltip-value">{healthScore.breakdown.ahorro}/40</span>
+                </div>
+                <div className="health-tooltip-hint">% de ingresos ahorrados (20% = 40 pts)</div>
+                <div className="health-tooltip-row">
+                  <span className="health-tooltip-label">Presupuestos</span>
+                  <span className="health-tooltip-value">{healthScore.breakdown.presupuestos}/35</span>
+                </div>
+                <div className="health-tooltip-hint">apego a tus límites por categoría</div>
+                <div className="health-tooltip-row">
+                  <span className="health-tooltip-label">Metas</span>
+                  <span className="health-tooltip-value">{healthScore.breakdown.metas}/25</span>
+                </div>
+                <div className="health-tooltip-hint">progreso promedio de tus metas</div>
+              </div>
+            )}
           </div>
 
           {showSettings && (
@@ -536,26 +885,34 @@ export default function Chatbot() {
           )}
 
           <div className="chat-messages">
-            {messages.map((msg, i) => (
-              <div key={i} className={`msg ${msg.role}`}>
-                {msg.role === "bot" ? (
-                  <>
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
-                    <InlineChart chart={msg.chart} />
-                    {msg.actions && msg.actions.length > 0 && i === messages.length - 1 && (
-                      <ActionChips
-                        actions={msg.actions}
-                        tarjetas={userTarjetas}
-                        onAportar={handleAportarAction}
-                        onNav={(path) => { navigate(path); setOpen(false); }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  msg.text
-                )}
-              </div>
-            ))}
+            {messages.map((msg, i) => {
+              const isLast = i === messages.length - 1;
+              const isStreamingThis = streaming && isLast && msg.role === "bot";
+              if (msg.role === "bot" && !msg.text && !msg.chart && !msg.simulator && !(msg.actions?.length)) {
+                return null;
+              }
+              return (
+                <div key={i} className={`msg ${msg.role}${isStreamingThis ? " streaming" : ""}`}>
+                  {msg.role === "bot" ? (
+                    <>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                      <InlineChart chart={msg.chart} />
+                      {msg.simulator && <InlineSimulator simulator={msg.simulator} />}
+                      {msg.actions && msg.actions.length > 0 && isLast && (
+                        <ActionChips
+                          actions={msg.actions}
+                          tarjetas={userTarjetas}
+                          onAportar={handleAportarAction}
+                          onNav={(path) => { navigate(path); setOpen(false); }}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    msg.text
+                  )}
+                </div>
+              );
+            })}
             {loading && (
               <div className="dot-anim">
                 <span /><span /><span />
@@ -588,15 +945,25 @@ export default function Chatbot() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              disabled={loading}
+              disabled={loading || streaming}
             />
-            <button
-              className="chat-send"
-              onClick={() => sendMessage()}
-              disabled={loading || !input.trim()}
-            >
-              ➤
-            </button>
+            {streaming ? (
+              <button
+                className="chat-send chat-cancel"
+                onClick={cancelStream}
+                title="Detener generación"
+              >
+                ■
+              </button>
+            ) : (
+              <button
+                className="chat-send"
+                onClick={() => sendMessage()}
+                disabled={loading || !input.trim()}
+              >
+                ➤
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -607,6 +974,7 @@ export default function Chatbot() {
           <span
             className="fab-score-badge"
             style={{ background: SCORE_COLORS[healthScore.color] }}
+            title={`Salud Financiera: ${healthScore.score}/100 (${healthScore.grade}) — Ahorro ${healthScore.breakdown.ahorro}/40, Presupuestos ${healthScore.breakdown.presupuestos}/35, Metas ${healthScore.breakdown.metas}/25`}
           >
             {healthScore.score}
           </span>

@@ -43,6 +43,94 @@
 
 .header-score {
     font-weight: 600;
+    cursor: help;
+}
+
+.chat-header {
+    position: relative;
+}
+
+.health-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 12px;
+    z-index: 1000;
+    width: 240px;
+    max-width: calc(100% - 24px);
+    background: #fff;
+    color: #222;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-weight: 400;
+    text-align: left;
+    animation: fadeIn 0.15s ease;
+}
+
+.health-tooltip::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: 16px;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-left: 1px solid #e5e5e5;
+    border-top: 1px solid #e5e5e5;
+    transform: rotate(45deg);
+}
+
+.health-tooltip::after {
+    content: "";
+    position: absolute;
+    top: -32px;
+    right: 0;
+    width: 100%;
+    height: 32px;
+}
+
+.health-tooltip-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 2px;
+}
+
+.health-tooltip-desc {
+    font-size: 11px;
+    color: #666;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.health-tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11px;
+    margin-top: 6px;
+}
+
+.health-tooltip-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.health-tooltip-value {
+    font-weight: 700;
+    color: #cc0000;
+    font-variant-numeric: tabular-nums;
+}
+
+.health-tooltip-hint {
+    font-size: 10px;
+    color: #888;
+    line-height: 1.3;
+    margin-top: -2px;
 }
 
 .chat-window {
@@ -167,7 +255,101 @@
     font-size: 13px;
     line-height: 1.55;
     word-break: break-word;
-    white-space: pre-wrap;
+}
+
+.msg.bot p {
+    margin: 0 0 8px 0;
+}
+.msg.bot p:last-child {
+    margin-bottom: 0;
+}
+.msg.bot ul,
+.msg.bot ol {
+    margin: 4px 0 8px 0;
+    padding-left: 20px;
+}
+.msg.bot ul:last-child,
+.msg.bot ol:last-child {
+    margin-bottom: 0;
+}
+.msg.bot li {
+    margin: 2px 0;
+}
+.msg.bot li > p {
+    margin: 0;
+}
+.msg.bot li::marker {
+    color: #cc0000;
+}
+.msg.bot strong {
+    font-weight: 700;
+    color: #222;
+}
+.msg.bot em {
+    font-style: italic;
+}
+.msg.bot code {
+    background: #f4f4f4;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.9em;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+.msg.bot pre {
+    background: #f4f4f4;
+    border-radius: 6px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    margin: 6px 0;
+}
+.msg.bot pre code {
+    background: transparent;
+    padding: 0;
+}
+.msg.bot h1,
+.msg.bot h2,
+.msg.bot h3,
+.msg.bot h4 {
+    margin: 8px 0 4px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #222;
+}
+.msg.bot h1:first-child,
+.msg.bot h2:first-child,
+.msg.bot h3:first-child {
+    margin-top: 0;
+}
+.msg.bot blockquote {
+    border-left: 3px solid #ddd;
+    margin: 6px 0;
+    padding: 0 10px;
+    color: #666;
+}
+.msg.bot table {
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 12px;
+    width: 100%;
+}
+.msg.bot th,
+.msg.bot td {
+    border: 1px solid #e5e5e5;
+    padding: 4px 8px;
+    text-align: left;
+}
+.msg.bot th {
+    background: #f9f9f9;
+    font-weight: 700;
+}
+.msg.bot a {
+    color: #cc0000;
+    text-decoration: underline;
+}
+.msg.bot hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 8px 0;
 }
 
 .chat-window.fullscreen .msg {
@@ -674,6 +856,135 @@
     margin: 16px auto;
 }
 
+.inline-sim {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 14px;
+    margin: 10px 0;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.sim-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #444;
+    margin: 0 0 12px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+}
+
+.sim-param {
+    margin-bottom: 12px;
+}
+
+.sim-param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+}
+
+.sim-param-label {
+    font-size: 11px;
+    color: #555;
+    font-weight: 600;
+}
+
+.sim-param-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #cc0000;
+    font-variant-numeric: tabular-nums;
+}
+
+.sim-param input[type="range"] {
+    width: 100%;
+    accent-color: #cc0000;
+    cursor: pointer;
+}
+
+.sim-output {
+    background: #fff8f8;
+    border: 1px solid #f5d5d5;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 4px;
+    text-align: center;
+}
+
+.sim-output-label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.sim-output-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #cc0000;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.sim-meta {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed #eee;
+}
+
+.sim-meta-label {
+    font-size: 10px;
+    color: #777;
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.sim-meta-bar {
+    position: relative;
+    width: 100%;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.sim-meta-bar-before {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: #999;
+}
+
+.sim-meta-bar-delta {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: #cc0000;
+}
+
+.sim-meta-pct {
+    font-size: 11px;
+    color: #555;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.chat-window.fullscreen .inline-sim {
+    max-width: 500px;
+    margin: 16px auto;
+}
+
 .chat-voice-btn {
     width: 36px;
     height: 36px;
@@ -711,5 +1022,20 @@
     width: 44px;
     height: 44px;
     font-size: 20px;
+}
+
+.chat-estado {
+    font-size: 0.75rem;
+    color: #888;
+    margin: 0 0 0 8px;
+    animation: fadeIn 0.3s ease;
+}
+
+.chat-cancel {
+    background: #f4f4f4 !important;
+    color: #333 !important;
+}
+.chat-cancel:hover {
+    background: #e6e6e6 !important;
 }
 

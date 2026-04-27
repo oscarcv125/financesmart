@@ -6,3 +6,26 @@
 */.env.local
 node_modules/
 demo_credentials.txt
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+
+# Archivos de Python compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pytest
+.pytest_cache/
+pytest.ini
+pytest_cache/
+
+# Tests
+tests/
+test_*.py
+
+# macOS
+.DS_Store
