@@ -202,3 +202,7 @@
   color: #000;
   border-bottom-style: solid;
 }
+
+select.modal-input{
+    padding-right:24px;
+}

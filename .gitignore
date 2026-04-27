@@ -26,3 +26,5 @@ pytest_cache/
 # Tests
 tests/
 test_*.py
+
+.DS_Store
