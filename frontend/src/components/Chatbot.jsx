@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import toast from "react-hot-toast";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -549,6 +550,7 @@ export default function Chatbot() {
   const analysisTriggered = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const sendMessageRef = useRef(null);
   const [showHealthTip, setShowHealthTip] = useState(false);
   const healthTipTimer = useRef(null);
   const [streaming, setStreaming] = useState(false);
@@ -652,18 +654,35 @@ export default function Chatbot() {
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       recognition.lang = "es-MX";
 
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
+
+      recognition.onerror = (event) => {
+        setIsListening(false);
+        const messages = {
+          "not-allowed": "Permiso de micrófono denegado. Habilítalo en tu navegador.",
+          "service-not-allowed": "El reconocimiento de voz no está disponible.",
+          "no-speech": "No detecté ninguna voz. Intenta de nuevo.",
+          "audio-capture": "No se encontró micrófono.",
+          "network": "Error de red. Verifica tu conexión.",
+        };
+        if (event.error === "aborted") return;
+        toast.error(messages[event.error] || "Error en el reconocimiento de voz.");
+      };
+
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
-          setInput(transcript);
-          // Optional: automatically send after a small delay
-          // setTimeout(() => sendMessage(transcript), 500);
+        let transcript = "";
+        let isFinal = false;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) isFinal = true;
+        }
+        setInput(transcript);
+        if (isFinal && transcript.trim()) {
+          setTimeout(() => sendMessageRef.current?.(transcript), 350);
         }
       };
       recognitionRef.current = recognition;
@@ -672,13 +691,19 @@ export default function Chatbot() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("Tu navegador no soporta reconocimiento de voz.");
+      toast.error("Tu navegador no soporta reconocimiento de voz.");
       return;
     }
     if (isListening) {
       recognitionRef.current.stop();
     } else {
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // Already started — restart it
+        recognitionRef.current.stop();
+        setTimeout(() => recognitionRef.current?.start(), 200);
+      }
     }
   };
 
@@ -943,6 +968,8 @@ export default function Chatbot() {
     }
   };
 
+  sendMessageRef.current = sendMessage;
+
   const cancelStream = () => {
     if (streamAbortRef.current) {
       streamAbortRef.current.abort();
@@ -1150,7 +1177,7 @@ export default function Chatbot() {
             <div ref={bottomRef} />
           </div>
 
-          {messages.length <= 1 && !loading && (
+          {!messages.some((m) => m.role === "user") && !loading && (
             <div className="quick-chips">
               {(mode === "analyst" ? ANALYST_CHIPS : COACH_CHIPS).map((chip, i) => (
                 <button key={i} className="chip" onClick={() => sendMessage(chip)}>

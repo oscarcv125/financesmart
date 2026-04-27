@@ -105,36 +105,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // 3. Duplicate-charge detection: same descripcion within 5 days, similar amount
-    const possibleDupes = new Map();
-    for (const m of thisMovs) {
-      if (m.tipo?.toLowerCase() !== 'gasto') continue;
-      const key = (m.descripcion || '').trim().toLowerCase();
-      if (!key) continue;
-      if (!possibleDupes.has(key)) possibleDupes.set(key, []);
-      possibleDupes.get(key).push({ fecha: m.fecha, monto: Math.abs(Number(m.monto)) });
-    }
-    for (const [desc, list] of possibleDupes.entries()) {
-      if (list.length < 2) continue;
-      const sorted = list.sort((a, b) => a.fecha.localeCompare(b.fecha));
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1];
-        const cur = sorted[i];
-        const diffDays = (new Date(cur.fecha) - new Date(prev.fecha)) / 86400000;
-        const amtDiff = Math.abs(cur.monto - prev.monto) / Math.max(prev.monto, 1);
-        if (diffDays <= 5 && amtDiff < 0.05 && prev.monto >= 50) {
-          insights.push({
-            severity: 'medium',
-            icon: '🔁',
-            title: `Posible cargo duplicado: ${desc}`,
-            detail: `Dos cobros de ~$${prev.monto.toFixed(0)} en menos de ${Math.ceil(diffDays)} días. ¿Revisar?`,
-          });
-          break;
-        }
-      }
-    }
-
-    // 4. Upcoming recurrencias in next 5 days
+    // 3. Upcoming recurrencias in next 5 days
     const recsList = recurrenciasRes.data || [];
     const upcomingRecs = recsList.filter(r => {
       const d = r.dia_del_mes;
