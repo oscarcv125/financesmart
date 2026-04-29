@@ -240,7 +240,7 @@ function extractChart(text) {
 const SIMULATOR_RE = /\[?\s*SIMULATOR\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*SIMULATOR\s*\]?/i;
 const VALID_SIM_TYPES = new Set(['savings_daily', 'category_reduction', 'goal_acceleration', 'compound_savings']);
 
-const STREAK_RE = /\[?\s*STREAK\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*STREAK\s*\]?/i;
+const STREAK_RE = /\[?\s*STREAKS?\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*STREAKS?\s*\]?/i;
 
 function extractStreak(text) {
   const match = text.match(STREAK_RE);
@@ -478,7 +478,9 @@ const TERMINATOR_MARKERS = [
   'CHART {', 'SIMULATOR {', 'STREAK {', 'COMPARE {',
   'PIE {', 'BAR {', 'LINE {',
   'CHART{', 'SIMULATOR{', 'STREAK{', 'COMPARE{',
-  'PIE{', 'BAR{', 'LINE{'
+  'PIE{', 'BAR{', 'LINE{',
+  '\nCHART', '\nSIMULATOR', '\nSTREAK', '\nCOMPARE',
+  '\nPIE', '\nBAR', '\nLINE'
 ];
 const SAFE_BUFFER = 15; // Increased buffer to catch variations
 
