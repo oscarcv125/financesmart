@@ -207,7 +207,7 @@ function suggestCoachActions(data) {
   return actions.slice(0, 3);
 }
 
-const CHART_RE = /\[?(CHART|PIE|BAR|LINE)\]?\s*([\s\S]*?)\s*\[\/(CHART|PIE|BAR|LINE)\]/i;
+const CHART_RE = /\[?\s*(CHART|PIE|BAR|LINE)\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*(CHART|PIE|BAR|LINE)\s*\]?/i;
 const VALID_CHART_TYPES = new Set(['pie', 'bar', 'line']);
 
 function extractChart(text) {
@@ -237,10 +237,10 @@ function extractChart(text) {
   }
 }
 
-const SIMULATOR_RE = /\[?SIMULATOR\]?\s*([\s\S]*?)\s*\[\/SIMULATOR\]/i;
+const SIMULATOR_RE = /\[?\s*SIMULATOR\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*SIMULATOR\s*\]?/i;
 const VALID_SIM_TYPES = new Set(['savings_daily', 'category_reduction', 'goal_acceleration', 'compound_savings']);
 
-const STREAK_RE = /\[?STREAK\]?\s*([\s\S]*?)\s*\[\/STREAK\]/i;
+const STREAK_RE = /\[?\s*STREAK\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*STREAK\s*\]?/i;
 
 function extractStreak(text) {
   const match = text.match(STREAK_RE);
@@ -260,7 +260,7 @@ function extractStreak(text) {
   }
 }
 
-const COMPARE_RE = /\[?COMPARE\]?\s*([\s\S]*?)\s*\[\/COMPARE\]/i;
+const COMPARE_RE = /\[?\s*COMPARE\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*COMPARE\s*\]?/i;
 
 function extractCompare(text) {
   const match = text.match(COMPARE_RE);
@@ -474,9 +474,11 @@ ${contexto}${chartInstructions}`;
 }
 
 const TERMINATOR_MARKERS = [
-  '[CHART]', '[SIMULATOR]', '[STREAK]', '[COMPARE]',
+  '[CHART', '[SIMULATOR', '[STREAK', '[COMPARE',
   'CHART {', 'SIMULATOR {', 'STREAK {', 'COMPARE {',
-  'PIE {', 'BAR {', 'LINE {'
+  'PIE {', 'BAR {', 'LINE {',
+  'CHART{', 'SIMULATOR{', 'STREAK{', 'COMPARE{',
+  'PIE{', 'BAR{', 'LINE{'
 ];
 const SAFE_BUFFER = 15; // Increased buffer to catch variations
 

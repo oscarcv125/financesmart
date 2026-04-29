@@ -394,8 +394,8 @@ function InlineChart({ chart }) {
 function MessageContent({ text }) {
   if (!text) return null;
 
-  // Pattern to find any of our tags, with or without opening brackets
-  const pattern = /\[?(CHART|COMPARE|STREAK|SIMULATOR|PIE|BAR|LINE)\]?\s*(\{[\s\S]*?\})\s*\[\/(CHART|COMPARE|STREAK|SIMULATOR|PIE|BAR|LINE)\]/gi;
+  // Pattern to find any of our tags, with or without opening brackets, allowing for flexible spacing
+  const pattern = /\[?\s*(CHART|COMPARE|STREAK|SIMULATOR|PIE|BAR|LINE)\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*(CHART|COMPARE|STREAK|SIMULATOR|PIE|BAR|LINE|CHART)\s*\]?/gi;
 
   const parts = [];
   let lastIdx = 0;
