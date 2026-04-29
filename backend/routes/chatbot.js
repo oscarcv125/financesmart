@@ -207,7 +207,7 @@ function suggestCoachActions(data) {
   return actions.slice(0, 3);
 }
 
-const CHART_RE = /\[CHART\]\s*([\s\S]*?)\s*\[\/CHART\]/;
+const CHART_RE = /\[?(CHART|PIE|BAR|LINE)\]?\s*([\s\S]*?)\s*\[\/(CHART|PIE|BAR|LINE)\]/i;
 const VALID_CHART_TYPES = new Set(['pie', 'bar', 'line']);
 
 function extractChart(text) {
@@ -216,7 +216,9 @@ function extractChart(text) {
 
   const cleanText = text.replace(CHART_RE, '').trim();
   try {
-    const raw = JSON.parse(match[1].trim());
+    const raw = JSON.parse(match[2].trim());
+    const tagType = match[1].toLowerCase();
+    if (!raw.type && ['pie', 'bar', 'line'].includes(tagType)) raw.type = tagType;
     if (!VALID_CHART_TYPES.has(raw.type)) return { text: cleanText, chart: null };
     if (!raw.title || typeof raw.title !== 'string') return { text: cleanText, chart: null };
     const maxPoints = raw.type === 'line' ? 30 : 8;
@@ -235,10 +237,10 @@ function extractChart(text) {
   }
 }
 
-const SIMULATOR_RE = /\[SIMULATOR\]\s*([\s\S]*?)\s*\[\/SIMULATOR\]/;
+const SIMULATOR_RE = /\[?SIMULATOR\]?\s*([\s\S]*?)\s*\[\/SIMULATOR\]/i;
 const VALID_SIM_TYPES = new Set(['savings_daily', 'category_reduction', 'goal_acceleration', 'compound_savings']);
 
-const STREAK_RE = /\[STREAK\]\s*([\s\S]*?)\s*\[\/STREAK\]/;
+const STREAK_RE = /\[?STREAK\]?\s*([\s\S]*?)\s*\[\/STREAK\]/i;
 
 function extractStreak(text) {
   const match = text.match(STREAK_RE);
@@ -258,7 +260,7 @@ function extractStreak(text) {
   }
 }
 
-const COMPARE_RE = /\[COMPARE\]\s*([\s\S]*?)\s*\[\/COMPARE\]/;
+const COMPARE_RE = /\[?COMPARE\]?\s*([\s\S]*?)\s*\[\/COMPARE\]/i;
 
 function extractCompare(text) {
   const match = text.match(COMPARE_RE);
@@ -471,8 +473,12 @@ ${brevityRules}
 ${contexto}${chartInstructions}`;
 }
 
-const TERMINATOR_MARKERS = ['[CHART]', '[SIMULATOR]', '[STREAK]', '[COMPARE]'];
-const SAFE_BUFFER = Math.max(...TERMINATOR_MARKERS.map(m => m.length)) - 1;
+const TERMINATOR_MARKERS = [
+  '[CHART]', '[SIMULATOR]', '[STREAK]', '[COMPARE]',
+  'CHART {', 'SIMULATOR {', 'STREAK {', 'COMPARE {',
+  'PIE {', 'BAR {', 'LINE {'
+];
+const SAFE_BUFFER = 15; // Increased buffer to catch variations
 
 function findEarliestMarker(text) {
   let earliest = -1;

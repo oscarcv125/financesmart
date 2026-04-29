@@ -391,6 +391,78 @@ function InlineChart({ chart }) {
   return null;
 }
 
+function MessageContent({ text }) {
+  if (!text) return null;
+
+  // Pattern to find any of our tags, with or without opening brackets
+  const pattern = /\[?(CHART|COMPARE|STREAK|SIMULATOR|PIE|BAR|LINE)\]?\s*(\{[\s\S]*?\})\s*\[\/(CHART|COMPARE|STREAK|SIMULATOR|PIE|BAR|LINE)\]/gi;
+
+  const parts = [];
+  let lastIdx = 0;
+  let match;
+
+  // Use matchAll to get all occurrences
+  const matches = [...text.matchAll(pattern)];
+  
+  if (matches.length === 0) {
+    return <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>;
+  }
+
+  for (const m of matches) {
+    // Text before the match
+    if (m.index > lastIdx) {
+      parts.push({ type: "text", content: text.slice(lastIdx, m.index) });
+    }
+
+    const tagType = m[1].toUpperCase();
+    const jsonStr = m[2];
+    
+    try {
+      const data = JSON.parse(jsonStr);
+      // Handle CHART and its specific variants (PIE/BAR/LINE)
+      if (["CHART", "PIE", "BAR", "LINE"].includes(tagType)) {
+        if (!data.type) {
+          if (tagType === "PIE") data.type = "pie";
+          else if (tagType === "BAR") data.type = "bar";
+          else if (tagType === "LINE") data.type = "line";
+          else data.type = "pie"; // fallback
+        }
+        parts.push({ type: "chart", data });
+      } else if (tagType === "COMPARE") {
+        parts.push({ type: "compare", data });
+      } else if (tagType === "STREAK") {
+        parts.push({ type: "streak", data });
+      } else if (tagType === "SIMULATOR") {
+        parts.push({ type: "simulator", data });
+      }
+    } catch (e) {
+      // If parsing fails, treat it as text
+      parts.push({ type: "text", content: m[0] });
+    }
+    lastIdx = m.index + m[0].length;
+  }
+
+  // Remaining text
+  if (lastIdx < text.length) {
+    parts.push({ type: "text", content: text.slice(lastIdx) });
+  }
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === "text") {
+          return <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>{part.content}</ReactMarkdown>;
+        }
+        if (part.type === "chart") return <InlineChart key={i} chart={part.data} />;
+        if (part.type === "compare") return <InlineCompare key={i} compare={part.data} />;
+        if (part.type === "streak") return <InlineStreak key={i} streak={part.data} />;
+        if (part.type === "simulator") return <InlineSimulator key={i} simulator={part.data} />;
+        return null;
+      })}
+    </>
+  );
+}
+
 function ActionChips({ actions, tarjetas, onAportar, onNav }) {
   const [picking, setPicking] = useState(null);
   const [selectedTarjeta, setSelectedTarjeta] = useState("");
@@ -1124,7 +1196,7 @@ export default function Chatbot() {
                 <div key={i} className={`msg ${msg.role}${isStreamingThis ? " streaming" : ""}`}>
                   {msg.role === "bot" ? (
                     <>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                      <MessageContent text={msg.text} />
                       <InlineChart chart={msg.chart} />
                       <InlineStreak streak={msg.streak} />
                       <InlineCompare compare={msg.compare} />
