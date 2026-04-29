@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import toast from "react-hot-toast";
-import { TbRobotFace, TbSettings, TbBulb, TbChartBar, TbTarget, TbUserCog, TbMaximize, TbMinimize, TbPigMoney, TbAlertCircle, TbTrendingUp, TbTarget as TbGoal, TbGauge } from "react-icons/tb";
+import { TbRobotFace, TbSettings, TbBulb, TbChartBar, TbTarget, TbUserCog, TbMaximize, TbMinimize, TbPigMoney, TbAlertCircle, TbTrendingUp, TbTarget as TbGoal, TbGauge, TbMicrophone, TbPlayerStop, TbSquare, TbFlame, TbCheck } from "react-icons/tb";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -27,6 +27,8 @@ const emojiToIcon = (emoji) => {
     "📈": <TbTrendingUp size={18} color="#6CC04A" />,
     "🎯": <TbGoal size={18} color="#cc0000" />,
     "⚡": <TbGauge size={18} color="#1976d2" />,
+    "🔥": <TbFlame size={18} color="#FF4500" />,
+    "✅": <TbCheck size={18} color="#4caf50" />,
   };
   return iconMap[emoji] || emoji;
 };
@@ -181,7 +183,7 @@ function InlineStreak({ streak }) {
   return (
     <div className="inline-streak">
       <div className="streak-left">
-        <div className="streak-icon">{icon || "🔥"}</div>
+        <div className="streak-icon">{emojiToIcon(icon || "🔥")}</div>
         <div className="streak-value-block">
           <div className="streak-value">{current}</div>
           <div className="streak-unit">{unit}</div>
@@ -555,7 +557,7 @@ const buildMsgBienvenida = (nombre, mode) => ({
   role: "bot",
   text: mode === "analyst"
     ? `Hola, ${nombre.split(" ")[0]}. Soy tu Analista Financiero. Analizando tu situación actual...`
-    : `¡Hola, ${nombre.split(" ")[0]}! 👋 Soy tu Coach Financiero. Estoy aquí para ayudarte a alcanzar tus metas y mejorar tus hábitos financieros. ¿Por dónde empezamos?`,
+    : `¡Hola, ${nombre.split(" ")[0]}! Soy tu Coach Financiero. Estoy aquí para ayudarte a alcanzar tus metas y mejorar tus hábitos financieros. ¿Por dónde empezamos?`,
 });
 
 async function readChatbotStream(res, { onDelta, onDone, onError, signal }) {
@@ -743,7 +745,7 @@ export default function Chatbot() {
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = true;
+      recognition.interimResults = false;
       recognition.lang = "es-MX";
 
       recognition.onstart = () => setIsListening(true);
@@ -756,10 +758,11 @@ export default function Chatbot() {
           "service-not-allowed": "El reconocimiento de voz no está disponible.",
           "no-speech": "No detecté ninguna voz. Intenta de nuevo.",
           "audio-capture": "No se encontró micrófono.",
-          "network": "Error de red. Verifica tu conexión.",
+          "network": "Error de conexión con el servicio de voz. Verifica tu internet o usa Chrome.",
         };
         if (event.error === "aborted") return;
-        toast.error(messages[event.error] || "Error en el reconocimiento de voz.");
+        try { recognition.abort(); } catch (e) {}
+        toast.error(messages[event.error] || `Error de voz: ${event.error}`);
       };
 
       recognition.onresult = (event) => {
@@ -785,13 +788,16 @@ export default function Chatbot() {
     }
     if (isListening) {
       recognitionRef.current.stop();
+      setIsListening(false);
     } else {
       try {
         recognitionRef.current.start();
       } catch {
-        // Already started — restart it
-        recognitionRef.current.stop();
-        setTimeout(() => recognitionRef.current?.start(), 200);
+        // Fallback if start fails (e.g. already starting)
+        recognitionRef.current.abort();
+        setTimeout(() => {
+          try { recognitionRef.current.start(); } catch { setIsListening(false); }
+        }, 250);
       }
     }
   };
@@ -1095,7 +1101,7 @@ export default function Chatbot() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al aportar");
-      const successText = `✅ Aporte de **$${Number(action.monto).toFixed(2)}** a **${action.nombre_meta}** realizado. Nuevo progreso: $${Number(data.nuevoProgreso).toFixed(2)}.`;
+      const successText = `Aporte de **$${Number(action.monto).toFixed(2)}** a **${action.nombre_meta}** realizado. Nuevo progreso: $${Number(data.nuevoProgreso).toFixed(2)}.`;
       setExtraMessages((prev) => [...prev, { role: "bot", text: successText }]);
     } catch (err) {
       setExtraMessages((prev) => [
@@ -1241,7 +1247,7 @@ export default function Chatbot() {
               onClick={toggleListening}
               title={isListening ? "Escuchando..." : "Dictar mensaje"}
             >
-              {isListening ? "🛑" : "🎤"}
+              {isListening ? <TbPlayerStop size={20} /> : <TbMicrophone size={20} />}
             </button>
             <input
               className="chat-input"
@@ -1257,7 +1263,7 @@ export default function Chatbot() {
                 onClick={cancelStream}
                 title="Detener generación"
               >
-                ■
+                <TbSquare size={16} />
               </button>
             ) : (
               <button
