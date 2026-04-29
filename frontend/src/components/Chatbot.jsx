@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import toast from "react-hot-toast";
+import { TbRobotFace, TbSettings, TbBulb, TbChartBar, TbTarget, TbUserCog, TbMaximize, TbMinimize, TbPigMoney, TbAlertCircle, TbTrendingUp, TbTarget as TbGoal, TbGauge } from "react-icons/tb";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -18,6 +19,17 @@ const CHART_PALETTE = ["#cc0000", "#2196f3", "#4caf50", "#ff9800", "#9c27b0", "#
 
 const TW_DEFAULT_INTERVAL_MS = 18;
 const TW_DEFAULT_BASE_STEP = 2;
+
+const emojiToIcon = (emoji) => {
+  const iconMap = {
+    "⚠️": <TbAlertCircle size={18} color="#FFA400" />,
+    "🚨": <TbAlertCircle size={18} color="#EB0029" />,
+    "📈": <TbTrendingUp size={18} color="#6CC04A" />,
+    "🎯": <TbGoal size={18} color="#cc0000" />,
+    "⚡": <TbGauge size={18} color="#1976d2" />,
+  };
+  return iconMap[emoji] || emoji;
+};
 
 function fmtMXN(v) {
   return `$${Number(v).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -101,13 +113,13 @@ function InlineInsights({ insights }) {
         title={`${insights.length} detección${insights.length !== 1 ? "es" : ""}`}
         type="button"
       >
-        💡 {insights.length}
+        <TbBulb size={14} style={{ marginRight: 4 }} /> {insights.length}
       </button>
       {showModal && (
         <div className="insights-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="insights-modal" onClick={(e) => e.stopPropagation()}>
             <div className="insights-modal-header">
-              <span>💡 Detecciones ({insights.length})</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><TbBulb size={16} /> Detecciones ({insights.length})</span>
               <button
                 className="insights-modal-close"
                 onClick={() => setShowModal(false)}
@@ -119,7 +131,7 @@ function InlineInsights({ insights }) {
             <div className="insights-modal-body">
               {insights.map((ins, i) => (
                 <div key={i} className={`insight-row sev-${ins.severity}`}>
-                  <span className="insight-icon">{ins.icon}</span>
+                  <span className="insight-icon">{emojiToIcon(ins.icon)}</span>
                   <div className="insight-body">
                     <div className="insight-title">{ins.title}</div>
                     <div className="insight-detail">{ins.detail}</div>
@@ -439,7 +451,7 @@ function ActionChips({ actions, tarjetas, onAportar, onNav }) {
     <div className="action-chips">
       {actions.map((action, i) => (
         <button key={i} className="action-chip" onClick={() => handleChip(action)}>
-          {action.type === "aportar" ? "💰 " : "→ "}{action.label}
+          {action.type === "aportar" ? <span style={{ marginRight: 6, display: "inline-flex", alignItems: "center" }}><TbPigMoney size={14} /></span> : "→ "}{action.label}
         </button>
       ))}
     </div>
@@ -1045,60 +1057,17 @@ export default function Chatbot() {
           )}
           <div className="chat-header" onMouseDown={handleMouseDown}>
             <div>
-              <h3>🤖 Fortia AI</h3>
-              <p>
-                Modo {mode === "coach" ? "Coach" : "Analista"} · En línea
-                {healthScore !== null && (
-                  <span
-                    className="header-score"
-                    style={{ color: SCORE_COLORS[healthScore.color] }}
-                    tabIndex={0}
-                    onMouseEnter={showHealthTooltip}
-                    onMouseLeave={hideHealthTooltip}
-                    onFocus={showHealthTooltip}
-                    onBlur={hideHealthTooltip}
-                  >
-                    {" "}· {healthScore.score}/100 {healthScore.grade}
-                  </span>
-                )}
-              </p>
+              <h3><TbRobotFace style={{ display: "inline", marginRight: 6, color: "#fff" }} size={18} /> Fortia AI</h3>
+              <p>Modo {mode === "coach" ? "Coach" : "Analista"} · En línea</p>
             </div>
             <div className="chat-header-actions">
               {insights && insights.length > 0 && <InlineInsights insights={insights} />}
-              <button className="chat-icon-btn" onClick={() => setShowSettings((s) => !s)} title="Configuración">⚙</button>
+              <button className="chat-icon-btn" onClick={() => setShowSettings((s) => !s)} title="Configuración"><TbUserCog size={16} /></button>
               <button className="chat-icon-btn" onClick={() => setFullscreen((f) => !f)} title={fullscreen ? "Restaurar" : "Pantalla completa"}>
-                {fullscreen ? "⊡" : "⛶"}
+                {fullscreen ? <TbMinimize size={16} /> : <TbMaximize size={16} />}
               </button>
               <button className="chat-icon-btn" onClick={() => { setOpen(false); setFullscreen(false); setShowSettings(false); setPos({ x: null, y: null }); setSize({ w: 370, h: 520 }); }}>✕</button>
             </div>
-            {healthScore !== null && showHealthTip && (
-              <div
-                className="health-tooltip"
-                role="tooltip"
-                onMouseEnter={showHealthTooltip}
-                onMouseLeave={hideHealthTooltip}
-              >
-                <div className="health-tooltip-title">Salud Financiera</div>
-                <div className="health-tooltip-desc">
-                  Puntaje 0-100 calculado sobre tu mes actual.
-                </div>
-                <div className="health-tooltip-row">
-                  <span className="health-tooltip-label">Ahorro</span>
-                  <span className="health-tooltip-value">{healthScore.breakdown.ahorro}/40</span>
-                </div>
-                <div className="health-tooltip-hint">% de ingresos ahorrados (20% = 40 pts)</div>
-                <div className="health-tooltip-row">
-                  <span className="health-tooltip-label">Presupuestos</span>
-                  <span className="health-tooltip-value">{healthScore.breakdown.presupuestos}/35</span>
-                </div>
-                <div className="health-tooltip-hint">apego a tus límites por categoría</div>
-                <div className="health-tooltip-row">
-                  <span className="health-tooltip-label">Metas</span>
-                  <span className="health-tooltip-value">{healthScore.breakdown.metas}/25</span>
-                </div>
-                <div className="health-tooltip-hint">progreso promedio de tus metas</div>
-              </div>
-            )}
           </div>
 
           {showSettings && (
@@ -1110,14 +1079,14 @@ export default function Chatbot() {
               <div className={`mode-option ${mode === "coach" ? "selected" : ""}`} onClick={() => handleModeChange("coach")}>
                 <div className="mode-option-header">
                   <div className="mode-dot" />
-                  <span className="mode-name">🎯 Coach Financiero</span>
+                  <span className="mode-name"><TbTarget size={16} style={{ marginRight: 8, display: "inline" }} /> Coach Financiero</span>
                 </div>
                 <span className="mode-desc">Te propone metas, te da consejos para ahorrar, te sugiere inversiones y te motiva a mejorar tus hábitos financieros.</span>
               </div>
               <div className={`mode-option ${mode === "analyst" ? "selected" : ""}`} onClick={() => handleModeChange("analyst")}>
                 <div className="mode-option-header">
                   <div className="mode-dot" />
-                  <span className="mode-name">📊 Analista Financiero</span>
+                  <span className="mode-name"><TbChartBar size={16} style={{ marginRight: 8, display: "inline" }} /> Analista Financiero</span>
                 </div>
                 <span className="mode-desc">Solo te presenta tus datos de forma objetiva y precisa. No da opiniones ni consejos a menos que se los pidas directamente.</span>
               </div>
@@ -1232,16 +1201,7 @@ export default function Chatbot() {
       )}
 
       <button className="fab" onClick={() => setOpen((o) => !o)}>
-        {open ? "✕" : "🤖"}
-        {!open && healthScore !== null && (
-          <span
-            className="fab-score-badge"
-            style={{ background: SCORE_COLORS[healthScore.color] }}
-            title={`Salud Financiera: ${healthScore.score}/100 (${healthScore.grade}) — Ahorro ${healthScore.breakdown.ahorro}/40, Presupuestos ${healthScore.breakdown.presupuestos}/35, Metas ${healthScore.breakdown.metas}/25`}
-          >
-            {healthScore.score}
-          </span>
-        )}
+        {open ? <span style={{ fontSize: "20px", fontWeight: "bold", lineHeight: 1 }}>✕</span> : <TbRobotFace size={24} color="#fff" />}
       </button>
     </>
   );

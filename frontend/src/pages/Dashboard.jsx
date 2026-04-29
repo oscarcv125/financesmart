@@ -127,7 +127,7 @@ export default function Dashboard() {
           monto,
           descripcion: form.descripcion.trim(),
           id_tarjeta: form.id_tarjeta,
-          id_categoria: form.id_categoria || null,
+          id_categoria: (form.id_categoria && form.id_categoria !== "otros") ? form.id_categoria : null,
           fecha: form.fecha,
         }),
       });
@@ -231,14 +231,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
         <span>Movimientos Recientes</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="modal-btn" onClick={exportarCsv} title="Exportar CSV">
+        <div style={{ display: "flex", gap: 8, flexShrink: 0, whiteSpace: "nowrap" }}>
+          <button className="modal-btn" onClick={exportarCsv} title="Exportar CSV" style={{ whiteSpace: "nowrap" }}>
             <TbDownload size={16} style={{ verticalAlign: "middle" }} /> CSV
           </button>
-          <button className="modal-btn confirm" onClick={abrirModal}>
-            <TbPlus size={16} style={{ verticalAlign: "middle" }} /> Agregar
+          <button className="modal-btn confirm" onClick={abrirModal} style={{ whiteSpace: "nowrap" }}>
+            Agregar <TbPlus size={16} style={{ verticalAlign: "middle", marginLeft: 4 }} />
           </button>
         </div>
       </div>
@@ -286,8 +286,8 @@ export default function Dashboard() {
                   {mov.tipo?.toLowerCase() === "gasto" ? "-" : "+"}${Math.abs(mov.monto).toFixed(2)}
                 </td>
                 <td>
-                  <button className="meta-btn" onClick={() => eliminarMovimiento(mov.id)} title="Eliminar">
-                    <TbTrash size={14} />
+                  <button className="delete-icon-btn" onClick={() => eliminarMovimiento(mov.id)} title="Eliminar">
+                    <TbTrash size={16} />
                   </button>
                 </td>
               </tr>
@@ -363,6 +363,7 @@ export default function Dashboard() {
                 {categoriasDelTipo.map(c => (
                   <option key={c.id_categoria} value={c.id_categoria}>{c.nombre}</option>
                 ))}
+                <option value="otros">Otros</option>
               </select>
             </div>
 

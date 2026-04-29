@@ -53,7 +53,7 @@
 .color-dot:hover { transform: scale(1.15); }
 .color-dot.selected { border-color: #323E48; }
 .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
-.modal-btn { flex: 1; height: 45px; border: none; border-radius: 4px; font-size: 15px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; }
+.modal-btn { flex: 1; height: 45px; padding: 0 18px; border: none; border-radius: 4px; font-size: 15px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .modal-btn.cancel { background: #EBF0F2; color: #5B6670; border: 1px solid #CFD2D3; }
 .modal-btn.cancel:hover { background: #CFD2D3; }
 .modal-btn.confirm { background: #EB0029; color: #fff; }

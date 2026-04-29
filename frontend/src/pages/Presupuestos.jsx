@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { TbPlus, TbTrash } from "react-icons/tb";
+import { TbPlus, TbTrash, TbEdit } from "react-icons/tb";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
@@ -16,6 +16,7 @@ export default function Presupuestos() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ id_categoria: "", monto: "" });
   const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
 
   const authHeaders = useCallback(() => ({ Authorization: `Bearer ${session.access_token}` }), [session]);
 
@@ -40,28 +41,24 @@ export default function Presupuestos() {
     if (session) cargar();
   }, [session, cargar]);
 
-  useEffect(() => {
-    items.forEach(i => {
-      if (i.excedido) toast.error(`Presupuesto excedido en ${i.categoria}`, { id: `pres-${i.id_presupuesto}` });
-      else if (i.pct >= 80) toast(`Vas al ${i.pct}% en ${i.categoria}`, { id: `pres-${i.id_presupuesto}`, icon: "⚠️" });
-    });
-  }, [items]);
-
   const guardar = async () => {
     if (!form.id_categoria) return toast.error("Selecciona una categoría");
     const m = parseFloat(form.monto);
     if (!m || m <= 0) return toast.error("Monto inválido");
     setSaving(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/presupuestos`, {
-        method: "POST",
+      const url = editId ? `${BACKEND_URL}/api/presupuestos/${editId}` : `${BACKEND_URL}/api/presupuestos`;
+      const method = editId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ id_categoria: form.id_categoria, monto: m }),
       });
       const out = await res.json();
       if (!res.ok) throw new Error(out.error);
-      toast.success("Presupuesto guardado");
+      toast.success(editId ? "Presupuesto actualizado" : "Presupuesto guardado");
       setForm({ id_categoria: "", monto: "" });
+      setEditId(null);
       setModal(false);
       cargar();
     } catch (err) {
@@ -69,6 +66,18 @@ export default function Presupuestos() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const abrirEditar = (item) => {
+    setEditId(item.id_presupuesto);
+    setForm({ id_categoria: item.id_categoria, monto: item.monto });
+    setModal(true);
+  };
+
+  const nuevoPresupuesto = () => {
+    setEditId(null);
+    setForm({ id_categoria: "", monto: "" });
+    setModal(true);
   };
 
   const eliminar = async (id) => {
@@ -83,7 +92,7 @@ export default function Presupuestos() {
     <main className="page-body">
       <div className="page-header-row">
         <div className="page-breadcrumb">Presupuestos › <strong>Mensual</strong></div>
-        <button className="btn-nueva-meta" onClick={() => setModal(true)}>
+        <button className="btn-nueva-meta" onClick={nuevoPresupuesto}>
           <TbPlus size={18} /> Nuevo presupuesto
         </button>
       </div>
@@ -117,6 +126,9 @@ export default function Presupuestos() {
               </div>
             </div>
             <div className="meta-actions">
+              <button className="meta-btn primary" onClick={() => abrirEditar(i)}>
+                <TbEdit size={16} /> Editar
+              </button>
               <button className="meta-btn" onClick={() => eliminar(i.id_presupuesto)}>
                 <TbTrash size={16} /> Eliminar
               </button>
@@ -128,13 +140,14 @@ export default function Presupuestos() {
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
           <div className="modal">
-            <div className="modal-title">Nuevo presupuesto mensual</div>
+            <div className="modal-title">{editId ? "Editar presupuesto" : "Nuevo presupuesto mensual"}</div>
             <div className="modal-field">
               <label className="modal-label">Categoría</label>
               <select
                 className="modal-input"
                 value={form.id_categoria}
                 onChange={e => setForm(f => ({ ...f, id_categoria: e.target.value }))}
+                disabled={editId}
               >
                 <option value="">Selecciona</option>
                 {categorias.map(c => (
@@ -155,7 +168,7 @@ export default function Presupuestos() {
             <div className="modal-actions">
               <button className="modal-btn cancel" onClick={() => setModal(false)}>Cancelar</button>
               <button className="modal-btn confirm" onClick={guardar} disabled={saving}>
-                {saving ? "Guardando..." : "Guardar"}
+                {saving ? (editId ? "Actualizando..." : "Guardando...") : (editId ? "Actualizar" : "Guardar")}
               </button>
             </div>
           </div>

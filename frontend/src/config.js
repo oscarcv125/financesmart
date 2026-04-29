@@ -11,9 +11,9 @@ export const BACKEND_URL = (() => {
     return 'https://financesmart1.onrender.com';
   }
   
-  // Si está en localhost, usar el backend local en Render (desarrollo)
+  // Si está en localhost, usar el backend local (desarrollo)
   if (origin.includes('localhost')) {
-    return 'http://localhost:10000';
+    return 'http://localhost:3001';
   }
   
   // En otros casos, asumir que están en el mismo host

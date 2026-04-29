@@ -206,3 +206,19 @@
 select.modal-input{
     padding-right:24px;
 }
+
+.delete-icon-btn {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.delete-icon-btn:hover {
+  color: #EB0029;
+}
