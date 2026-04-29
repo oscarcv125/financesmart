@@ -29,3 +29,6 @@ test_*.py
 
 # macOS
 .DS_Store
+
+# Google
+google-credentials.json
