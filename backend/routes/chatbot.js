@@ -56,7 +56,9 @@ async function fetchUserFinancialData(id_usuario) {
       .eq('id_usuario', id_usuario),
   ]);
 
-  const lista = movsRes.data || [];
+  const lista = (movsRes.data || []).filter(
+    m => !String(m.descripcion || '').startsWith('Ahorro:')
+  );
   const listaLast = movsLastRes.data || [];
 
   const ingresos = lista
@@ -374,7 +376,7 @@ NO incluyas gráfica para saludos, consejos generales o preguntas simples de sal
 === INSTRUCCIÓN DE SIMULADORES INTERACTIVOS ===
 Cuando el usuario pregunte "qué pasaría si...", "y si ahorro X al día", "cuánto se acumularía...", o cuando ofrecer una simulación sea útil para coaching, añade AL FINAL de tu respuesta UN bloque con este formato exacto:
 [SIMULATOR]
-{"type":"savings_daily","title":"Si ahorras todos los días","params":[{"key":"amount","label":"$ al día","value":150,"min":20,"max":500,"step":10,"unit":"MXN"},{"key":"days","label":"Días","value":30,"min":7,"max":90,"step":1}],"meta":{"name":"Viaje a Japón","target":35000,"progress":8200}}
+{"type":"savings_daily","title":"Si ahorras todos los días","params":[{"key":"amount","label":"$ al día","value":150,"min":20,"max":500,"step":10,"unit":"MXN"},{"key":"days","label":"Días","value":30,"min":7,"max":90,"step":1}],"meta":{"name":"Meta de ahorro","target":30000,"progress":10000}}
 [/SIMULATOR]
 
 Tipos válidos y ESTRUCTURA OBLIGATORIA de params (orden y keys EXACTAS):

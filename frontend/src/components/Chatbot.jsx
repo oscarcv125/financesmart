@@ -91,40 +91,46 @@ function computeSimulatorOutput(type, values, params, meta) {
 }
 
 function InlineInsights({ insights }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   if (!insights || !insights.length) return null;
-  const high = insights.filter((i) => i.severity === "high");
-  const visible = expanded ? insights : (high.length > 0 ? high.slice(0, 1) : insights.slice(0, 1));
-  const hidden = insights.length - visible.length;
   return (
-    <div className="inline-insights">
+    <>
       <button
-        className="insights-header"
-        onClick={() => setExpanded((e) => !e)}
+        className="insights-badge"
+        onClick={() => setShowModal(true)}
+        title={`${insights.length} detección${insights.length !== 1 ? "es" : ""}`}
         type="button"
       >
-        <span>💡 {insights.length} {insights.length === 1 ? "detección" : "detecciones"}</span>
-        <span className="insights-toggle">{expanded ? "▴ ocultar" : `▾ ver todo`}</span>
+        💡 {insights.length}
       </button>
-      {visible.map((ins, i) => (
-        <div key={i} className={`insight-row sev-${ins.severity}`}>
-          <span className="insight-icon">{ins.icon}</span>
-          <div className="insight-body">
-            <div className="insight-title">{ins.title}</div>
-            <div className="insight-detail">{ins.detail}</div>
+      {showModal && (
+        <div className="insights-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="insights-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="insights-modal-header">
+              <span>💡 Detecciones ({insights.length})</span>
+              <button
+                className="insights-modal-close"
+                onClick={() => setShowModal(false)}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="insights-modal-body">
+              {insights.map((ins, i) => (
+                <div key={i} className={`insight-row sev-${ins.severity}`}>
+                  <span className="insight-icon">{ins.icon}</span>
+                  <div className="insight-body">
+                    <div className="insight-title">{ins.title}</div>
+                    <div className="insight-detail">{ins.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      ))}
-      {!expanded && hidden > 0 && (
-        <button
-          className="insights-more"
-          onClick={() => setExpanded(true)}
-          type="button"
-        >
-          + {hidden} más
-        </button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -556,6 +562,7 @@ export default function Chatbot() {
   const [showHealthTip, setShowHealthTip] = useState(false);
   const healthTipTimer = useRef(null);
   const [streaming, setStreaming] = useState(false);
+  const [insights, setInsights] = useState(null);
   const streamAbortRef = useRef(null);
   const twConfigRef = useRef({
     intervalMs: TW_DEFAULT_INTERVAL_MS,
@@ -642,11 +649,7 @@ export default function Chatbot() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (!data?.insights?.length) return;
-        setExtraMessages((prev) => [
-          { role: "bot", insights: data.insights, text: "" },
-          ...prev,
-        ]);
+        if (data?.insights?.length) setInsights(data.insights);
       })
       .catch(() => {});
   }, [open, session, accepted]);
@@ -868,6 +871,8 @@ export default function Chatbot() {
     localStorage.removeItem("chat_history");
     setShowSettings(false);
     analysisTriggered.current = false;
+    insightsFetchedRef.current = false;
+    setInsights(null);
   };
 
   const sendMessage = async (text) => {
@@ -1059,6 +1064,7 @@ export default function Chatbot() {
               </p>
             </div>
             <div className="chat-header-actions">
+              {insights && insights.length > 0 && <InlineInsights insights={insights} />}
               <button className="chat-icon-btn" onClick={() => setShowSettings((s) => !s)} title="Configuración">⚙</button>
               <button className="chat-icon-btn" onClick={() => setFullscreen((f) => !f)} title={fullscreen ? "Restaurar" : "Pantalla completa"}>
                 {fullscreen ? "⊡" : "⛶"}
@@ -1142,7 +1148,7 @@ export default function Chatbot() {
             {messages.map((msg, i) => {
               const isLast = i === messages.length - 1;
               const isStreamingThis = streaming && isLast && msg.role === "bot";
-              if (msg.role === "bot" && !msg.text && !msg.chart && !msg.simulator && !msg.streak && !msg.compare && !msg.subscriptionAudit && !msg.insights && !(msg.actions?.length)) {
+              if (msg.role === "bot" && !msg.text && !msg.chart && !msg.simulator && !msg.streak && !msg.compare && !msg.subscriptionAudit && !(msg.actions?.length)) {
                 return null;
               }
               return (
@@ -1150,7 +1156,6 @@ export default function Chatbot() {
                   {msg.role === "bot" ? (
                     <>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-                      <InlineInsights insights={msg.insights} />
                       <InlineChart chart={msg.chart} />
                       <InlineStreak streak={msg.streak} />
                       <InlineCompare compare={msg.compare} />
