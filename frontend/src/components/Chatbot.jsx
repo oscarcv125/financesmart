@@ -11,6 +11,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import "../styles/chatbot.css";
+import { BACKEND_URL } from "../config";
+
 
 const CHART_PALETTE = ["#cc0000", "#2196f3", "#4caf50", "#ff9800", "#9c27b0", "#00bcd4", "#ff5722", "#795548"];
 
@@ -508,7 +510,7 @@ export default function Chatbot() {
 
   useEffect(() => {
     if (!session) return;
-    fetch("/api/me", {
+    fetch(`${BACKEND_URL}/api/me`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((res) => res.json())
@@ -520,7 +522,7 @@ export default function Chatbot() {
 
   const fetchHealthScore = useCallback(() => {
     if (!session) return;
-    fetch("/api/health", {
+    fetch(`${BACKEND_URL}/api/health`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((r) => r.json())
@@ -561,7 +563,7 @@ export default function Chatbot() {
   });
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/config")
+    fetch(`${BACKEND_URL}/api/config`)
       .then((r) => r.json())
       .then((cfg) => {
         if (cancelled || !cfg?.typewriter) return;
@@ -635,7 +637,7 @@ export default function Chatbot() {
   useEffect(() => {
     if (!open || !session || !accepted || insightsFetchedRef.current) return;
     insightsFetchedRef.current = true;
-    fetch("/api/insights", {
+    fetch(`${BACKEND_URL}/api/insights`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((r) => r.json())
@@ -735,7 +737,7 @@ export default function Chatbot() {
 
     setExtraMessages((prev) => [...prev, { role: "bot", text: "" }]);
 
-    fetch("/api/chatbot", {
+    fetch(`${BACKEND_URL}/api/chatbot`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -917,7 +919,7 @@ export default function Chatbot() {
     };
 
     try {
-      const res = await fetch("/api/chatbot", {
+      const res = await fetch(`${BACKEND_URL}/api/chatbot`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -994,7 +996,7 @@ export default function Chatbot() {
     });
 
     try {
-      const res = await fetch(`/api/metas/${action.id_meta}/aportar`, {
+      const res = await fetch(`${BACKEND_URL}/api/metas/${action.id_meta}/aportar`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
