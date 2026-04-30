@@ -76,11 +76,15 @@ async function fetchUserFinancialData(id_usuario) {
     .reduce((acc, m) => acc + Math.abs(Number(m.monto)), 0);
 
   const gastosPorCat = {};
+  const lastExpenseDateByCat = {};
   lista
     .filter(m => m.tipo?.toLowerCase() === 'gasto')
     .forEach(m => {
       const cat = m.categoria?.nombre || 'Otros';
       gastosPorCat[cat] = (gastosPorCat[cat] || 0) + Math.abs(Number(m.monto));
+      if (!lastExpenseDateByCat[cat] && m.fecha) {
+        lastExpenseDateByCat[cat] = m.fecha.split('T')[0];
+      }
     });
 
   const topCategorias = Object.entries(gastosPorCat)
@@ -134,7 +138,8 @@ async function fetchUserFinancialData(id_usuario) {
     metasRaw,
     tarjetasRaw,
     recurrenciasRaw,
-    presupuestoTotal
+    presupuestoTotal,
+    lastExpenseDateByCat
   };
 }
 
@@ -168,7 +173,7 @@ function calculateForecast(data) {
   };
 }
 
-function suggestCoachActions(data) {
+function suggestCoachActions(data, userMessage = '') {
   const actions = [];
   const { metasRaw, tarjetasRaw, saldo } = data;
 
@@ -185,6 +190,18 @@ function suggestCoachActions(data) {
       const faltante = Number(meta.monto_objetivo) - Number(meta.progreso);
       let sugerido = Math.ceil((faltante * 0.1) / 50) * 50;
       sugerido = Math.max(50, Math.min(sugerido, faltante));
+
+      // Detectar si el usuario mencionó un monto específico para esta meta
+      const metaKeywords = meta.nombre_meta.toLowerCase().split(/\s+/).join('|');
+      const montoPattern = new RegExp(`(\\$?\\d+(?:\\.\\d+)?)\\s*(?:para|a|al?|en)\\s*(?:el?\\s*)?(${metaKeywords})`, 'i');
+      const montoMatch = userMessage.match(montoPattern);
+
+      if (montoMatch) {
+        const montoEspecifico = parseFloat(montoMatch[1].replace('$', ''));
+        if (montoEspecifico > 0 && montoEspecifico <= faltante) {
+          sugerido = montoEspecifico;
+        }
+      }
 
       actions.push({
         type: 'aportar',
@@ -216,7 +233,9 @@ function extractChart(text) {
 
   const cleanText = text.replace(CHART_RE, '').trim();
   try {
-    const raw = JSON.parse(match[2].trim());
+    const jsonStr = extractJsonFromMatch(match[0]);
+    if (!jsonStr) return { text: cleanText, chart: null };
+    const raw = JSON.parse(jsonStr.trim());
     const tagType = match[1].toLowerCase();
     if (!raw.type && ['pie', 'bar', 'line'].includes(tagType)) raw.type = tagType;
     if (!VALID_CHART_TYPES.has(raw.type)) return { text: cleanText, chart: null };
@@ -237,7 +256,7 @@ function extractChart(text) {
   }
 }
 
-const SIMULATOR_RE = /\[?\s*SIMULATOR\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*SIMULATOR\s*\]?/i;
+const SIMULATOR_RE = /\*?\*?\s*SIMULATOR\s*\*?\*?\s*(\{[\s\S]*?\})\s*(?:\[?\s*\/\s*SIMULATOR\s*\]?)?/i;
 const VALID_SIM_TYPES = new Set(['savings_daily', 'category_reduction', 'goal_acceleration', 'compound_savings']);
 
 const STREAK_RE = /\[?\s*STREAKS?\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*STREAKS?\s*\]?/i;
@@ -247,7 +266,9 @@ function extractStreak(text) {
   if (!match) return { text, streak: null };
   const cleanText = text.replace(STREAK_RE, '').trim();
   try {
-    const raw = JSON.parse(match[1].trim());
+    const jsonStr = extractJsonFromMatch(match[0]);
+    if (!jsonStr) return { text: cleanText, streak: null };
+    const raw = JSON.parse(jsonStr.trim());
     if (typeof raw.label !== 'string' || !raw.label) return { text: cleanText, streak: null };
     if (typeof raw.current !== 'number' || raw.current < 0) return { text: cleanText, streak: null };
     if (raw.unit && typeof raw.unit !== 'string') delete raw.unit;
@@ -260,14 +281,33 @@ function extractStreak(text) {
   }
 }
 
-const COMPARE_RE = /\[?\s*COMPARE\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*COMPARE\s*\]?/i;
+const COMPARE_RE = /\*?\*?\s*COMPARE\s*\*?\*?\s*\{[\s\S]*?\}(?:\s*\[?\s*\/\s*COMPARE\s*\]?)?/i;
+
+function extractJsonFromMatch(matchStr) {
+  let braceCount = 0;
+  let startIdx = -1;
+  for (let i = 0; i < matchStr.length; i++) {
+    if (matchStr[i] === '{') {
+      if (startIdx === -1) startIdx = i;
+      braceCount++;
+    } else if (matchStr[i] === '}') {
+      braceCount--;
+      if (braceCount === 0 && startIdx !== -1) {
+        return matchStr.substring(startIdx, i + 1);
+      }
+    }
+  }
+  return null;
+}
 
 function extractCompare(text) {
   const match = text.match(COMPARE_RE);
   if (!match) return { text, compare: null };
   const cleanText = text.replace(COMPARE_RE, '').trim();
   try {
-    const raw = JSON.parse(match[1].trim());
+    const jsonStr = extractJsonFromMatch(match[0]);
+    if (!jsonStr) return { text: cleanText, compare: null };
+    const raw = JSON.parse(jsonStr.trim());
     if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, compare: null };
     if (typeof raw.leftLabel !== 'string' || typeof raw.rightLabel !== 'string') {
       return { text: cleanText, compare: null };
@@ -293,7 +333,9 @@ function extractSimulator(text) {
 
   const cleanText = text.replace(SIMULATOR_RE, '').trim();
   try {
-    const raw = JSON.parse(match[1].trim());
+    const jsonStr = extractJsonFromMatch(match[0]);
+    if (!jsonStr) return { text: cleanText, simulator: null };
+    const raw = JSON.parse(jsonStr.trim());
     if (!VALID_SIM_TYPES.has(raw.type)) return { text: cleanText, simulator: null };
     if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, simulator: null };
     if (!Array.isArray(raw.params) || raw.params.length === 0 || raw.params.length > 5) {
@@ -330,15 +372,29 @@ function pct(current, previous) {
 
 function buildSystemPrompt(mode, nombre, data) {
   const now = new Date();
+  const fechaActual = now.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const fechaISO = now.toISOString().split('T')[0];
   const mesActual = now.toLocaleString('es-MX', { month: 'long', year: 'numeric' });
 
+  const ultimoGastoTexto = Object.entries(data.lastExpenseDateByCat || {})
+    .map(([cat, date]) => `- ${cat}: ${date}`)
+    .join('\n') || 'Sin datos recientes';
+
   const contexto = `
+=== FECHA ACTUAL ===
+Hoy es ${fechaActual} (${fechaISO}).
+IMPORTANTE: TODAS tus respuestas, cálculos de rachas (streaks) y referencias de tiempo DEBEN basarse en esta fecha exacta.
+
 === ESTADO FINANCIERO – ${mesActual.toUpperCase()} ===
 - Ingresos: $${data.ingresos.toFixed(2)} MXN (${pct(data.ingresos, data.ingresosLast)} vs mes anterior)
 - Gastos:   $${data.gastos.toFixed(2)} MXN (${pct(data.gastos, data.gastosLast)} vs mes anterior)
 - Saldo:    $${data.saldo.toFixed(2)} MXN
 
-=== MOVIMIENTOS RECIENTES (este mes) ===
+=== ÚLTIMO GASTO POR CATEGORÍA ===
+(Usa esto para calcular rachas de días sin gastar con precisión)
+${ultimoGastoTexto}
+
+=== MOVIMIENTOS RECIENTES (últimos 10) ===
 | Fecha | Descripción | Tipo | Monto |
 |-------|-------------|------|-------|
 ${data.movRecientes || '(sin movimientos)'}
@@ -364,6 +420,7 @@ ${data.recurrencias || 'Sin recurrencias activas'}
 
   const chartInstructions = `
 === INSTRUCCIÓN DE GRÁFICAS ===
+ORDEN OBLIGATORIO: PRIMERO el texto de explicación, DESPUÉS la gráfica AL FINAL.
 Cuando tu respuesta muestre un desglose, comparación o distribución de datos financieros, añade AL FINAL de tu respuesta un bloque con este formato exacto:
 [CHART]
 {"type":"pie","title":"Título corto","data":[{"name":"Categoría","value":1234}]}
@@ -374,12 +431,32 @@ Tipos válidos:
 - "line": proyecciones / tendencias en el tiempo (ej. saldo a 30 días, gasto acumulado del mes). Cada elemento de "data" es un punto en el tiempo.
 Máx 30 puntos para line, 7 para pie/bar. Nombres máx 12 caracteres. JSON en una sola línea.
 NO incluyas gráfica para saludos, consejos generales o preguntas simples de saldo.
+IMPORTANTE: Siempre explica la gráfica CON TEXTO PRIMERO (al menos 1 oración), luego la gráfica AL FINAL.
 
 === INSTRUCCIÓN DE SIMULADORES INTERACTIVOS ===
-Cuando el usuario pregunte "qué pasaría si...", "y si ahorro X al día", "cuánto se acumularía...", o cuando ofrecer una simulación sea útil para coaching, añade AL FINAL de tu respuesta UN bloque con este formato exacto:
+⚠️ CRÍTICO: DEBES generar SIMULADORES OBLIGATORIAMENTE en estos casos:
+1. Usuario pregunta "qué pasaría si..." (savings_daily, category_reduction, goal_acceleration)
+2. Usuario pregunta sobre inversión a largo plazo: "y si invierto X al mes por Y años" → DEBES usar compound_savings
+3. Pregunta sobre "cuánto tendría en N años a tal rendimiento" → DEBES generar compound_savings
+
+ORDEN OBLIGATORIO: PRIMERO texto, DESPUÉS [SIMULATOR]...[/SIMULATOR] AL FINAL
+
+FORMATO EXACTO (no omitas nada):
 [SIMULATOR]
 {"type":"savings_daily","title":"Si ahorras todos los días","params":[{"key":"amount","label":"$ al día","value":150,"min":20,"max":500,"step":10,"unit":"MXN"},{"key":"days","label":"Días","value":30,"min":7,"max":90,"step":1}],"meta":{"name":"Meta de ahorro","target":30000,"progress":10000}}
 [/SIMULATOR]
+
+❌ NUNCA hagas esto:
+  - [COMPOUND SAVINGS] (el tag incorrecto)
+  - [savings_daily] (usar el nombre del tipo como tag)
+  - [compound_savings] (usar el nombre del tipo como tag)
+  - "Simulador" sin los tags
+  - "Con este plan, podrías..." sin los tags
+
+✅ SIEMPRE:
+  - Usa [SIMULATOR] para TODOS los simuladores, sin importar el tipo
+  - Explica una oración PRIMERO, luego el bloque [SIMULATOR] AL FINAL
+  - El tag es SIEMPRE [SIMULATOR]...[/SIMULATOR], NUNCA otros nombres
 
 Tipos válidos y ESTRUCTURA OBLIGATORIA de params (orden y keys EXACTAS):
 - "savings_daily": [{key:"amount",unit:"MXN"},{key:"days"}]. Output = amount × days.
@@ -417,7 +494,9 @@ OTRAS REGLAS:
 - NO incluyas SIMULATOR para preguntas que no involucren proyección.
 
 === INSTRUCCIÓN DE WIDGET STREAK ===
+ORDEN OBLIGATORIO: PRIMERO el texto de explicación, DESPUÉS la racha AL FINAL.
 SOLO emite STREAK para rachas POSITIVAS (comportamientos deseables consecutivos), nunca para gaps o ausencias de algo bueno.
+IMPORTANTE: Siempre explica la racha CON TEXTO PRIMERO (al menos 1 oración), luego el widget AL FINAL.
 Casos válidos:
 - Días consecutivos SIN gasto en una categoría problemática.
 - Días consecutivos BAJO presupuesto en una categoría.
@@ -434,16 +513,29 @@ Formato:
 - "best": récord histórico (opcional, omite si no lo conoces con certeza).
 - "icon": un solo emoji (opcional).
 - "context": frase de contexto (opcional).
-Si NO encuentras una racha positiva clara en los datos, NO emitas STREAK.
+Si el usuario pregunta por una racha de una categoría que no está en "ÚLTIMO GASTO POR CATEGORÍA", dile que no tienes datos recientes suficientes para calcularla, NO la inventes.
+Para calcular la racha, resta la fecha del "ÚLTIMO GASTO" de la "FECHA ACTUAL".
 
 === INSTRUCCIÓN DE WIDGET COMPARE (este mes vs anterior) ===
-Cuando el usuario pregunte "cómo voy contra el mes pasado", "compárame con mes anterior", o cuando una comparativa lado-a-lado sea más clara que un texto, añade AL FINAL de tu respuesta un bloque:
+⚠️ CRÍTICO: DEBES generar COMPARE OBLIGATORIAMENTE cuando:
+1. Usuario pregunta "cómo voy contra el mes pasado"
+2. Usuario pregunta "compárame con mes anterior"
+3. Una comparativa lado-a-lado es más clara que texto
+
+ORDEN OBLIGATORIO: PRIMERO texto, DESPUÉS [COMPARE]...[/COMPARE] AL FINAL
+
+FORMATO EXACTO (no omitas nada):
 [COMPARE]
 {"title":"Abril vs Marzo","leftLabel":"Marzo","rightLabel":"Abril","rows":[{"label":"Comida","left":4200,"right":5100},{"label":"Transporte","left":1900,"right":1500},{"label":"Saldo","left":12500,"right":14200}]}
 [/COMPARE]
+
 - "title": título corto. REQUERIDO.
 - "leftLabel" / "rightLabel": nombres de las dos columnas (típicamente periodos). REQUERIDO.
 - "rows": array de {label, left, right} con valores en MXN. Máx 8 filas.
+
+❌ NUNCA hagas esto: "[Titulo] Abril vs Marzo [Izquierda Etiqueta]..." sin los tags
+✅ SIEMPRE: Explica una oración PRIMERO, luego el bloque [COMPARE] AL FINAL
+
 El frontend calcula y muestra el delta (% y absoluto) automáticamente. NO incluyas el delta en los datos.`;
 
   const brevityRules = `
@@ -454,8 +546,17 @@ El frontend calcula y muestra el delta (% y absoluto) automáticamente. NO inclu
 - NO incluyas frases motivacionales largas, despedidas elaboradas, ni preguntas de seguimiento.
 - Si el usuario quiere más detalle, lo pedirá.`;
 
+  const noToolsClause = `
+IMPORTANTE - NO TIENES ACCESO A HERRAMIENTAS:
+- No tienes acceso a funciones, APIs, o herramientas que ejecutar.
+- No llames a funciones ni hagas llamadas a herramientas.
+- Todos los datos financieros ya han sido inyectados en este contexto.
+- Si necesitas información, úsala del contexto proporcionado a continuación.
+- Responde basándote EXCLUSIVAMENTE en los datos financieros proporcionados, NO en herramientas o llamadas a APIs.`;
+
   if (mode === 'analyst') {
     return `Eres FinanceSmart AI en modo ANALISTA FINANCIERO para el usuario ${nombre}.
+${noToolsClause}
 Responde SIEMPRE en español, de forma objetiva, precisa y profesional.
 No des consejos no solicitados a menos que el usuario los pida explícitamente.
 Mantén un tono neutro. No inventes datos fuera del contexto financiero proporcionado.
@@ -465,6 +566,7 @@ ${contexto}${chartInstructions}`;
   }
 
   return `Eres FinanceSmart AI en modo COACH FINANCIERO para el usuario ${nombre}.
+${noToolsClause}
 Responde SIEMPRE en español, de forma motivadora y cercana, pero CONCISA.
 Usa los datos financieros reales del usuario para proponer acciones concretas y alcanzables.
 Relaciona siempre tus consejos con sus metas de ahorro, sus presupuestos y sus cargos recurrentes.
@@ -480,7 +582,11 @@ const TERMINATOR_MARKERS = [
   'CHART{', 'SIMULATOR{', 'STREAK{', 'COMPARE{',
   'PIE{', 'BAR{', 'LINE{',
   '\nCHART', '\nSIMULATOR', '\nSTREAK', '\nCOMPARE',
-  '\nPIE', '\nBAR', '\nLINE'
+  '\nPIE', '\nBAR', '\nLINE',
+  '**CHART', '**SIMULATOR', '**STREAK', '**COMPARE',
+  '*CHART', '*SIMULATOR', '*STREAK', '*COMPARE',
+  '**PIE', '**BAR', '**LINE',
+  '*PIE', '*BAR', '*LINE'
 ];
 const SAFE_BUFFER = 15; // Increased buffer to catch variations
 
@@ -572,7 +678,7 @@ router.post('/', async (req, res) => {
 
     const SAVINGS_INTENT_RE = /ahorr|meta|aport|guardar|fondo|inversi|presupuest|alcanza|object/i;
     const showActions = mode === 'coach' && SAVINGS_INTENT_RE.test(message);
-    const actions = showActions ? suggestCoachActions(financialData) : [];
+    const actions = showActions ? suggestCoachActions(financialData, message) : [];
 
     const SUB_INTENT_RE = /suscrip|recurrent|cancel|netflix|spotify|cobro.*mes|cu[aá]nto.*pago.*mes|servic.*(mensual|recurrent)/i;
     let subscriptionAudit = null;

@@ -593,6 +593,22 @@ async function readChatbotStream(res, { onDelta, onDone, onError, signal }) {
   }
 }
 
+function getStreamingStatus(text) {
+  if (!text) return 'pensando...';
+
+  const hasChart = /\[?\s*(CHART|PIE|BAR|LINE|SIMULATOR)\s*\]?/i.test(text);
+  const hasCompare = /\[?\s*COMPARE\s*\]?/i.test(text);
+  const hasStreak = /\[?\s*STREAKS?\s*\]?/i.test(text);
+  const hasSimulator = /\[?\s*SIMULATOR\s*\]?/i.test(text);
+
+  if (hasSimulator) return 'creando simulador...';
+  if (hasChart) return 'creando gráfica...';
+  if (hasCompare) return 'comparando...';
+  if (hasStreak) return 'analizando rachas...';
+
+  return 'pensando...';
+}
+
 export default function Chatbot() {
   const { session } = useAuth();
   const navigate = useNavigate();
@@ -1224,8 +1240,15 @@ export default function Chatbot() {
               );
             })}
             {loading && (
-              <div className="dot-anim">
-                <span /><span /><span />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                <div className="dot-anim">
+                  <span /><span /><span />
+                </div>
+                {streaming && messages.length > 0 && (
+                  <span style={{ fontSize: 11, color: '#999', fontStyle: 'italic', marginLeft: 4 }}>
+                    {getStreamingStatus(typewriterRef.current.target)}
+                  </span>
+                )}
               </div>
             )}
             <div ref={bottomRef} />

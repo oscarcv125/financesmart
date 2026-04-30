@@ -1,6 +1,6 @@
 import "../styles/dashboard.css";
 import { useState, useEffect, useCallback } from "react";
-import { TbPlus, TbTrash, TbDownload } from "react-icons/tb";
+import { TbPlus, TbTrash, TbDownload, TbCalendar, TbCoin, TbArrowUp, TbArrowDown, TbFilter } from "react-icons/tb";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import PageLoader from "../components/Skeleton";
@@ -33,6 +33,20 @@ export default function Dashboard() {
     montoMax: "",
   });
   const [filtrosVisibles, setFiltrosVisibles] = useState(false);
+  const [sortBy, setSortBy] = useState("fecha_desc");
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  const sortOptions = [
+    { value: 'fecha_desc', label: 'Más Recientes', icon: TbCalendar },
+    { value: 'fecha_asc', label: 'Más Antiguos', icon: TbCalendar },
+    { value: 'monto_desc', label: 'Mayor Monto', icon: TbCoin },
+    { value: 'monto_asc', label: 'Menor Monto', icon: TbCoin },
+    { value: 'categoria_asc', label: 'Categoría (A-Z)', icon: TbArrowUp },
+    { value: 'categoria_desc', label: 'Categoría (Z-A)', icon: TbArrowDown },
+  ];
+
+  const currentSortOption = sortOptions.find(opt => opt.value === sortBy);
+
   function filtroMovimientos(mov){
     if(filtros.fechaInicio && mov.fecha < filtros.fechaInicio) return false;
     if(filtros.fechaFin && mov.fecha > filtros.fechaFin) return false;
@@ -185,7 +199,28 @@ export default function Dashboard() {
       : String(c.tipo || "").toLowerCase() !== "ingreso"
   );
 
-  const movimientosFiltrados = data?.movimientos.filter(filtroMovimientos) || [];
+  const movimientosFiltrados = (data?.movimientos.filter(filtroMovimientos) || []).sort((a, b) => {
+    switch(sortBy) {
+      case "fecha_desc":
+        return new Date(b.fecha) - new Date(a.fecha);
+      case "fecha_asc":
+        return new Date(a.fecha) - new Date(b.fecha);
+      case "monto_desc":
+        return Math.abs(b.monto) - Math.abs(a.monto);
+      case "monto_asc":
+        return Math.abs(a.monto) - Math.abs(b.monto);
+      case "categoria_asc": {
+        const catCompare = (a.categoria?.nombre || "").localeCompare(b.categoria?.nombre || "");
+        return catCompare !== 0 ? catCompare : new Date(b.fecha) - new Date(a.fecha);
+      }
+      case "categoria_desc": {
+        const catCompare = (b.categoria?.nombre || "").localeCompare(a.categoria?.nombre || "");
+        return catCompare !== 0 ? catCompare : new Date(b.fecha) - new Date(a.fecha);
+      }
+      default:
+        return 0;
+    }
+  });
 
   if (loading && !data) return <PageLoader />;
   if (!data) return <div className="page-body">Error al cargar datos.</div>;
@@ -244,9 +279,98 @@ export default function Dashboard() {
       </div>
       
       <div style={{marginBottom:1}}>
-        <button className="modal-btn" onClick={() => setFiltrosVisibles(v => !v)}>
-          Filtros {filtrosVisibles ? "▲" : "▼"}
-        </button>
+        <div style={{display:'flex',gap:12,marginBottom:filtrosVisibles ? 20 : 0,alignItems:'center',flexWrap:'wrap'}}>
+          <button
+            onClick={() => setFiltrosVisibles(v => !v)}
+            style={{
+              display:'flex',
+              alignItems:'center',
+              gap:'6px',
+              padding:'8px 14px',
+              backgroundColor:filtrosVisibles ? '#f0f0f0' : 'transparent',
+              border:'1px solid #ddd',
+              borderRadius:'6px',
+              cursor:'pointer',
+              fontSize:'14px',
+              fontWeight:500,
+              color:'#333',
+              transition:'all 0.2s'
+            }}
+            onMouseEnter={e => e.target.style.backgroundColor='#f5f5f5'}
+            onMouseLeave={e => e.target.style.backgroundColor=filtrosVisibles ? '#f0f0f0' : 'transparent'}
+          >
+            <TbFilter size={16} />
+            Filtros {filtrosVisibles ? "▲" : "▼"}
+          </button>
+          <div style={{position:'relative', width:'200px'}}>
+            <button
+              onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+              style={{
+                width:'100%',
+                padding:'8px 12px',
+                border:'1px solid #ddd',
+                borderRadius:'4px',
+                backgroundColor:'white',
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                gap:'8px',
+                fontSize:'14px',
+                fontFamily:'inherit',
+              }}
+            >
+              {currentSortOption && <currentSortOption.icon size={16} style={{color:'#666'}} />}
+              <span>{currentSortOption?.label || 'Ordenar'}</span>
+            </button>
+            {sortDropdownOpen && (
+              <div
+                style={{
+                  position:'absolute',
+                  top:'100%',
+                  left:0,
+                  right:0,
+                  marginTop:'4px',
+                  backgroundColor:'white',
+                  border:'1px solid #ddd',
+                  borderRadius:'4px',
+                  boxShadow:'0 2px 8px rgba(0,0,0,0.1)',
+                  zIndex:1000,
+                  maxHeight:'300px',
+                  overflowY:'auto',
+                }}
+              >
+                {sortOptions.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setSortBy(opt.value);
+                      setSortDropdownOpen(false);
+                    }}
+                    style={{
+                      width:'100%',
+                      padding:'10px 12px',
+                      border:'none',
+                      backgroundColor:sortBy === opt.value ? '#f0f0f0' : 'transparent',
+                      cursor:'pointer',
+                      display:'flex',
+                      alignItems:'center',
+                      gap:'8px',
+                      fontSize:'13px',
+                      fontFamily:'inherit',
+                      textAlign:'left',
+                      transition:'background-color 0.15s',
+                    }}
+                    onMouseEnter={e => e.target.style.backgroundColor='#f5f5f5'}
+                    onMouseLeave={e => e.target.style.backgroundColor=sortBy === opt.value ? '#f0f0f0' : 'transparent'}
+                  >
+                    <opt.icon size={14} style={{color:'#666'}} />
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         {filtrosVisibles && (
       <div style={{display:'flex',gap:8,marginBottom:2,flexWrap:'wrap', width:'fit-content'}}>
         <input type="date" className="modal-input"  value={filtros.fechaInicio} onChange={e => setFiltros(f => ({ ...f, fechaInicio: e.target.value }))} />
