@@ -48,10 +48,12 @@ describe('authMiddleware', () => {
 
     supabase.auth.getUser.mockResolvedValue({ data: { user: mockUser }, error: null });
 
+    // Middleware chains .from('usuario').select('*').eq().order().limit(1) → array
     const chain = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: mockUsuario, error: null }),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue({ data: [mockUsuario], error: null }),
     };
     supabase.from.mockReturnValue(chain);
 
@@ -75,18 +77,18 @@ describe('authMiddleware', () => {
     supabase.from.mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
-        // First call: select existing → null
+        // First call: select existing → empty array
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+          order: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
         };
       }
-      // Second call: insert new user
+      // Second call: insert new user (.insert([row]).select().maybeSingle())
       const insertChain = {
         select: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockResolvedValue({ data: created, error: null }),
-        then: (r, j) => Promise.resolve({ data: created, error: null }).then(r, j),
       };
       return {
         insert: jest.fn(() => insertChain),
@@ -105,7 +107,8 @@ describe('authMiddleware', () => {
     const chain = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: new Error('DB down') }),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue({ data: null, error: new Error('DB down') }),
     };
     supabase.from.mockReturnValue(chain);
 

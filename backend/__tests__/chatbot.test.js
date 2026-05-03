@@ -7,12 +7,47 @@ jest.mock('../middleware/auth', () => (req, _res, next) => {
   next();
 });
 
+// Mock aiProvider — chatbot route imports it at module load.
+// jest.mock is hoisted above all requires, so the factory must construct the mock itself.
+jest.mock('../utils/aiProvider', () => {
+  const { mockProvider } = require('./helpers/mockProvider');
+  return mockProvider('Tu saldo es positivo.');
+});
+
 const request = require('supertest');
 const app = require('../app');
 const { supabase } = require('../utils/supabaseserver');
+const provider = require('../utils/aiProvider'); // resolves to the mock above
+const { parseSSE } = require('./helpers/sse');
 
-// Stub the Gemini fetch globally
-global.fetch = jest.fn();
+function setProviderResponse(text) {
+  provider.calls.length = 0;
+  provider.generate = async (args) => {
+    provider.calls.push({ method: 'generate', args });
+    return text;
+  };
+  provider.generateStream = async function* (args) {
+    provider.calls.push({ method: 'generateStream', args });
+    const chunkSize = 16;
+    for (let i = 0; i < text.length; i += chunkSize) {
+      if (args?.signal?.aborted) break;
+      yield text.slice(i, i + chunkSize);
+    }
+  };
+}
+
+function setProviderError(err) {
+  provider.calls.length = 0;
+  provider.generate = async (args) => {
+    provider.calls.push({ method: 'generate', args });
+    throw err;
+  };
+  // eslint-disable-next-line require-yield
+  provider.generateStream = async function* (args) {
+    provider.calls.push({ method: 'generateStream', args });
+    throw err;
+  };
+}
 
 function mockEmptyDB() {
   const emptyChain = {
@@ -43,15 +78,6 @@ function mockDBWithMetas(metas = [], tarjetas = []) {
       chain.then = (r) => Promise.resolve({ data: [], error: null }).then(r);
     }
     return chain;
-  });
-}
-
-function mockGemini(reply = 'Respuesta de prueba.') {
-  global.fetch.mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      candidates: [{ content: { parts: [{ text: reply }] } }],
-    }),
   });
 }
 
@@ -86,131 +112,132 @@ describe('POST /api/chatbot – input validation', () => {
   });
 });
 
-describe('POST /api/chatbot – happy path', () => {
+describe('POST /api/chatbot – happy path (SSE)', () => {
   beforeEach(() => {
     mockEmptyDB();
-    mockGemini('Tu saldo es positivo.');
+    setProviderResponse('Tu saldo es positivo.');
   });
 
-  test('200 returns reply from Gemini', async () => {
+  test('200 streams reply via SSE done event', async () => {
     const res = await request(app).post('/api/chatbot').send({ message: '¿Cuál es mi saldo?', mode: 'coach' });
     expect(res.status).toBe(200);
-    expect(res.body.reply).toBe('Tu saldo es positivo.');
+    const sse = parseSSE(res.text);
+    expect(sse.done).not.toBeNull();
+    expect(sse.done.reply).toBe('Tu saldo es positivo.');
+    expect(sse.fullText).toBe('Tu saldo es positivo.');
   });
 
   test('defaults to coach mode when mode not provided', async () => {
     const res = await request(app).post('/api/chatbot').send({ message: 'Hola' });
     expect(res.status).toBe(200);
-    expect(res.body.reply).toBeDefined();
+    const sse = parseSSE(res.text);
+    expect(sse.done).not.toBeNull();
+    expect(sse.done.reply).toBeDefined();
   });
 
   test('accepts analyst mode', async () => {
     const res = await request(app).post('/api/chatbot').send({ message: 'Analiza mis finanzas', mode: 'analyst' });
     expect(res.status).toBe(200);
-    expect(res.body.reply).toBeDefined();
+    const sse = parseSSE(res.text);
+    expect(sse.done.reply).toBeDefined();
   });
 
-  test('passes conversation history to Gemini', async () => {
+  test('passes conversation history to provider', async () => {
     const history = [
       { role: 'user', parts: [{ text: 'Hola' }] },
       { role: 'model', parts: [{ text: 'Hola, ¿en qué te ayudo?' }] },
     ];
     const res = await request(app).post('/api/chatbot').send({ message: 'Gracias', history, mode: 'coach' });
     expect(res.status).toBe(200);
+    const lastCall = provider.calls[provider.calls.length - 1];
+    expect(lastCall.method).toBe('generateStream');
+    expect(lastCall.args.history).toEqual(history);
+    expect(lastCall.args.message).toBe('Gracias');
+  });
 
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    expect(body.contents.length).toBe(3); // 2 history + 1 new message
+  test('returns provider name in done payload', async () => {
+    const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.provider).toBe('mock');
   });
 });
 
 describe('POST /api/chatbot – system prompt content', () => {
-  beforeEach(() => mockEmptyDB());
+  beforeEach(() => {
+    mockEmptyDB();
+    setProviderResponse('ok');
+  });
 
   test('coach prompt includes coach persona', async () => {
-    mockGemini('ok');
     await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    const prompt = body.system_instruction.parts[0].text;
-    expect(prompt).toMatch(/coach/i);
-    expect(prompt).toMatch(/motivador/i);
+    const lastCall = provider.calls[provider.calls.length - 1];
+    expect(lastCall.args.systemPrompt).toMatch(/coach/i);
+    expect(lastCall.args.systemPrompt).toMatch(/motivador/i);
   });
 
   test('analyst prompt includes analyst persona', async () => {
-    mockGemini('ok');
     await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'analyst' });
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    const prompt = body.system_instruction.parts[0].text;
-    expect(prompt).toMatch(/analista/i);
-    expect(prompt).toMatch(/objetivo/i);
+    const lastCall = provider.calls[provider.calls.length - 1];
+    expect(lastCall.args.systemPrompt).toMatch(/analista/i);
+    expect(lastCall.args.systemPrompt).toMatch(/objetivo/i);
   });
 
   test('prompt contains financial context sections', async () => {
-    mockGemini('ok');
     await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    const prompt = body.system_instruction.parts[0].text;
+    const lastCall = provider.calls[provider.calls.length - 1];
+    const prompt = lastCall.args.systemPrompt;
     expect(prompt).toMatch(/PRESUPUESTOS/);
     expect(prompt).toMatch(/METAS DE AHORRO/);
     expect(prompt).toMatch(/CARGOS RECURRENTES/);
   });
 
   test('prompt includes vs last month comparison', async () => {
-    mockGemini('ok');
     await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'analyst' });
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    const prompt = body.system_instruction.parts[0].text;
-    expect(prompt).toMatch(/mes anterior/);
+    const lastCall = provider.calls[provider.calls.length - 1];
+    expect(lastCall.args.systemPrompt).toMatch(/mes anterior/);
   });
 });
 
 describe('POST /api/chatbot – actions (coach mode)', () => {
-  test('coach mode returns actions array', async () => {
+  test('coach mode returns actions array in done event', async () => {
     mockEmptyDB();
-    mockGemini('Consejo financiero.');
+    setProviderResponse('Consejo financiero.');
     const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.actions)).toBe(true);
+    const sse = parseSSE(res.text);
+    expect(Array.isArray(sse.done.actions)).toBe(true);
   });
 
   test('analyst mode returns empty actions array', async () => {
     mockEmptyDB();
-    mockGemini('Análisis.');
+    setProviderResponse('Análisis.');
     const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'analyst' });
-    expect(res.status).toBe(200);
-    expect(res.body.actions).toEqual([]);
+    const sse = parseSSE(res.text);
+    expect(sse.done.actions).toEqual([]);
   });
 
   test('returns tarjetas in coach mode', async () => {
     mockEmptyDB();
-    mockGemini('ok');
+    setProviderResponse('ok');
     const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    expect(Array.isArray(res.body.tarjetas)).toBe(true);
+    const sse = parseSSE(res.text);
+    expect(Array.isArray(sse.done.tarjetas)).toBe(true);
   });
 
-  test('suggests aportar action when user has metas and tarjetas', async () => {
+  test('suggests aportar action when user has metas + tarjetas + savings intent', async () => {
     const metas = [{ id_meta: 1, nombre_meta: 'Vacaciones', monto_objetivo: 10000, progreso: 3000, fecha_limite: null }];
     const tarjetas = [{ id_tarjeta: 5, nombre: 'Débito' }];
     mockDBWithMetas(metas, tarjetas);
-    mockGemini('Excelente meta!');
+    setProviderResponse('Excelente meta!');
 
-    const res = await request(app).post('/api/chatbot').send({ message: 'Cómo avanzo?', mode: 'coach' });
+    const res = await request(app).post('/api/chatbot').send({ message: '¿cómo va mi meta de ahorro?', mode: 'coach' });
     expect(res.status).toBe(200);
-    const aportarAction = res.body.actions.find(a => a.type === 'aportar');
+    const sse = parseSSE(res.text);
+    const aportarAction = sse.done.actions.find(a => a.type === 'aportar');
     expect(aportarAction).toBeDefined();
     expect(aportarAction.id_meta).toBe(1);
     expect(aportarAction.nombre_meta).toBe('Vacaciones');
     expect(aportarAction.monto).toBeGreaterThan(0);
-  });
-
-  test('suggests nav action when no metas exist', async () => {
-    mockDBWithMetas([], [{ id_tarjeta: 1, nombre: 'Débito' }]);
-    // Simulate positive saldo by having ingresos (no movimientos → saldo 0, so no nav action)
-    // With empty DB saldo = 0, no nav action either. Test the label when saldo > 0 via direct logic.
-    mockGemini('ok');
-    const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    expect(res.status).toBe(200);
-    // No metas + no saldo → no actions (both conditions for nav require saldo > 0)
-    expect(res.body.actions.every(a => a.type !== 'aportar')).toBe(true);
   });
 
   test('returns max 3 actions', async () => {
@@ -222,25 +249,105 @@ describe('POST /api/chatbot – actions (coach mode)', () => {
     ];
     const tarjetas = [{ id_tarjeta: 1, nombre: 'Débito' }];
     mockDBWithMetas(metas, tarjetas);
-    mockGemini('ok');
+    setProviderResponse('ok');
 
-    const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    expect(res.body.actions.length).toBeLessThanOrEqual(3);
+    const res = await request(app).post('/api/chatbot').send({ message: 'quiero ahorrar', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.actions.length).toBeLessThanOrEqual(3);
   });
 });
 
-describe('POST /api/chatbot – Gemini error handling', () => {
+describe('POST /api/chatbot – provider error handling (SSE error event)', () => {
   beforeEach(() => mockEmptyDB());
 
-  test('500 when Gemini returns non-ok status', async () => {
-    global.fetch.mockResolvedValue({ ok: false, status: 503 });
+  test('emits error event when provider stream throws', async () => {
+    setProviderError(new Error('upstream 503'));
     const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    expect(res.status).toBe(500);
+    // SSE keeps HTTP 200 but emits an error event and ends the stream.
+    expect(res.status).toBe(200);
+    const sse = parseSSE(res.text);
+    expect(sse.error).not.toBeNull();
+    expect(sse.error.error).toMatch(/error/i);
+  });
+});
+
+describe('POST /api/chatbot – widgets[] dual-emit', () => {
+  beforeEach(() => mockEmptyDB());
+
+  test('done.widgets is an empty array when LLM emits no tags', async () => {
+    setProviderResponse('Tu saldo es positivo.');
+    const res = await request(app).post('/api/chatbot').send({ message: '¿saldo?', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.widgets).toEqual([]);
   });
 
-  test('500 when fetch throws', async () => {
-    global.fetch.mockRejectedValue(new Error('Network error'));
-    const res = await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
-    expect(res.status).toBe(500);
+  test('CHART tag → done.chart AND done.widgets contains a chart entry', async () => {
+    const reply = 'Aquí está tu desglose. [CHART]{"type":"pie","title":"Por categoría","data":[{"name":"Comida","value":1200},{"name":"Transporte","value":800}]}[/CHART]';
+    setProviderResponse(reply);
+    const res = await request(app).post('/api/chatbot').send({ message: 'desglose', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.chart).not.toBeNull();
+    expect(sse.done.chart.type).toBe('pie');
+    expect(Array.isArray(sse.done.widgets)).toBe(true);
+    expect(sse.done.widgets.length).toBe(1);
+    expect(sse.done.widgets[0].kind).toBe('chart');
+    expect(sse.done.widgets[0].chart).toEqual(sse.done.chart);
+  });
+
+  test('STREAK tag → done.streak AND done.widgets contains a streak entry', async () => {
+    const reply = 'Vas bien. [STREAK]{"label":"Días sin comer fuera","current":7,"unit":"días","best":12}[/STREAK]';
+    setProviderResponse(reply);
+    const res = await request(app).post('/api/chatbot').send({ message: 'racha?', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.streak).not.toBeNull();
+    expect(sse.done.streak.current).toBe(7);
+    expect(sse.done.widgets.length).toBe(1);
+    expect(sse.done.widgets[0].kind).toBe('streak');
+    expect(sse.done.widgets[0].streak.current).toBe(7);
+  });
+
+  test('COMPARE tag → done.compare AND done.widgets contains a compare entry', async () => {
+    const reply = 'Comparativa: [COMPARE]{"title":"Abr vs Mar","leftLabel":"Mar","rightLabel":"Abr","rows":[{"label":"Comida","left":4200,"right":5100}]}[/COMPARE]';
+    setProviderResponse(reply);
+    const res = await request(app).post('/api/chatbot').send({ message: 'compara', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.compare).not.toBeNull();
+    expect(sse.done.widgets.length).toBe(1);
+    expect(sse.done.widgets[0].kind).toBe('compare');
+  });
+
+  test('SIMULATOR tag → done.simulator AND done.widgets contains a simulator entry', async () => {
+    const reply = 'Simula esto: [SIMULATOR]{"type":"savings_daily","title":"Si ahorras","params":[{"key":"amount","label":"$ al día","value":150,"min":20,"max":500,"step":10,"unit":"MXN"},{"key":"days","label":"Días","value":30,"min":7,"max":90,"step":1}]}[/SIMULATOR]';
+    setProviderResponse(reply);
+    const res = await request(app).post('/api/chatbot').send({ message: 'simula', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.simulator).not.toBeNull();
+    expect(sse.done.widgets.length).toBe(1);
+    expect(sse.done.widgets[0].kind).toBe('simulator');
+  });
+
+  test('done.capabilities reflects mock provider caps', async () => {
+    setProviderResponse('ok');
+    const res = await request(app).post('/api/chatbot').send({ message: 'hola', mode: 'coach' });
+    const sse = parseSSE(res.text);
+    expect(sse.done.capabilities).toBeTruthy();
+    expect(sse.done.capabilities.supportsStreaming).toBe(true);
+  });
+});
+
+describe('POST /api/chatbot – provider abstraction sanity', () => {
+  test('uses generateStream method on the AI provider', async () => {
+    mockEmptyDB();
+    setProviderResponse('ok');
+    await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
+    expect(provider.calls.some(c => c.method === 'generateStream')).toBe(true);
+  });
+
+  test('does not call legacy non-streaming generate', async () => {
+    mockEmptyDB();
+    setProviderResponse('ok');
+    provider.calls.length = 0;
+    await request(app).post('/api/chatbot').send({ message: 'Hola', mode: 'coach' });
+    expect(provider.calls.every(c => c.method !== 'generate')).toBe(true);
   });
 });

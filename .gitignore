@@ -32,3 +32,22 @@ test_*.py
 
 # Google
 google-credentials.json
+
+# Test artifacts (generated, not source)
+backend/test_report_manual.json
+backend/test_results.csv
+backend/test_results_report.csv
+backend/regression/reports/
+backend/regression/summary.csv
+backend/coverage/
+
+# Build output
+frontend/dist/
+
+# Editor
+.vscode/
+.idea/
+
+# Local Claude / IDE state
+.claude/
+*.local.json

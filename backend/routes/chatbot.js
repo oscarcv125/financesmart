@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseserver');
 const aiProvider = require('../utils/aiProvider');
+const { buildToolRegistry } = require('../utils/tools');
+const { runAgentLoop } = require('../utils/agent/loop');
+const { SYSTEM_PROMPT_TOOL_PREAMBLE, buildSystemPromptGuardrails } = require('../utils/agent/grounding');
+const logger = require('../utils/logger');
+const auditLog = require('../utils/auditLog');
 
 function monthBounds(offsetMonths = 0) {
   const now = new Date();
@@ -256,8 +261,40 @@ function extractChart(text) {
   }
 }
 
-const SIMULATOR_RE = /\*?\*?\s*SIMULATOR\s*\*?\*?\s*(\{[\s\S]*?\})\s*(?:\[?\s*\/\s*SIMULATOR\s*\]?)?/i;
 const VALID_SIM_TYPES = new Set(['savings_daily', 'category_reduction', 'goal_acceleration', 'compound_savings']);
+
+/**
+ * Find a tag block of the form `[TAG]{...}[/TAG]`, `TAG {...}`, `**TAG**{...}`, etc.
+ * Brace-counts the JSON so nested objects inside arrays are handled correctly,
+ * unlike the older non-greedy regex that truncated at the first `}`.
+ * Returns { json, start, end } or null.
+ */
+function findTaggedBlock(text, tagName) {
+  const prefixRe = new RegExp(
+    `\\[?\\s*\\*?\\*?\\s*${tagName}\\s*\\*?\\*?\\s*\\]?\\s*(?=\\{)`,
+    'i'
+  );
+  const m = prefixRe.exec(text);
+  if (!m) return null;
+  const jsonStart = m.index + m[0].length;
+  let depth = 0;
+  let end = -1;
+  for (let i = jsonStart; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') {
+      depth--;
+      if (depth === 0) { end = i + 1; break; }
+    }
+  }
+  if (end === -1) return null;
+
+  // Optional closing tag immediately after the JSON
+  const closeRe = new RegExp(`^\\s*\\[?\\s*\\/\\s*${tagName}\\s*\\]?`, 'i');
+  const closeM = closeRe.exec(text.slice(end));
+  const blockEnd = closeM ? end + closeM[0].length : end;
+
+  return { json: text.slice(jsonStart, end), start: m.index, end: blockEnd };
+}
 
 const STREAK_RE = /\[?\s*STREAKS?\s*\]?\s*(\{[\s\S]*?\})\s*\[?\s*\/\s*STREAKS?\s*\]?/i;
 
@@ -281,7 +318,6 @@ function extractStreak(text) {
   }
 }
 
-const COMPARE_RE = /\*?\*?\s*COMPARE\s*\*?\*?\s*\{[\s\S]*?\}(?:\s*\[?\s*\/\s*COMPARE\s*\]?)?/i;
 
 function extractJsonFromMatch(matchStr) {
   let braceCount = 0;
@@ -301,13 +337,11 @@ function extractJsonFromMatch(matchStr) {
 }
 
 function extractCompare(text) {
-  const match = text.match(COMPARE_RE);
-  if (!match) return { text, compare: null };
-  const cleanText = text.replace(COMPARE_RE, '').trim();
+  const block = findTaggedBlock(text, 'COMPARE');
+  if (!block) return { text, compare: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
   try {
-    const jsonStr = extractJsonFromMatch(match[0]);
-    if (!jsonStr) return { text: cleanText, compare: null };
-    const raw = JSON.parse(jsonStr.trim());
+    const raw = JSON.parse(block.json.trim());
     if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, compare: null };
     if (typeof raw.leftLabel !== 'string' || typeof raw.rightLabel !== 'string') {
       return { text: cleanText, compare: null };
@@ -327,15 +361,146 @@ function extractCompare(text) {
   }
 }
 
-function extractSimulator(text) {
-  const match = text.match(SIMULATOR_RE);
-  if (!match) return { text, simulator: null };
+// === New widget extractors (heatmap, gauge, forecast, subs, top merchants) ===
+// All share findTaggedBlock semantics so brackets, asterisks, and absent
+// closing tags are tolerated.
 
-  const cleanText = text.replace(SIMULATOR_RE, '').trim();
+function extractGauge(text) {
+  const block = findTaggedBlock(text, 'GAUGE');
+  if (!block) return { text, gauge: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
   try {
-    const jsonStr = extractJsonFromMatch(match[0]);
-    if (!jsonStr) return { text: cleanText, simulator: null };
-    const raw = JSON.parse(jsonStr.trim());
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, gauge: null };
+    if (typeof raw.value !== 'number') return { text: cleanText, gauge: null };
+    if (typeof raw.max !== 'number' || raw.max <= 0) return { text: cleanText, gauge: null };
+    return { text: cleanText, gauge: raw };
+  } catch {
+    return { text: cleanText, gauge: null };
+  }
+}
+
+function extractHeatmap(text) {
+  const block = findTaggedBlock(text, 'HEATMAP');
+  if (!block) return { text, heatmap: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, heatmap: null };
+    if (!Array.isArray(raw.cells) || raw.cells.length === 0 || raw.cells.length > 70) {
+      return { text: cleanText, heatmap: null };
+    }
+    const valid = raw.cells.every(c => typeof c?.label === 'string' && typeof c?.value === 'number');
+    if (!valid) return { text: cleanText, heatmap: null };
+    return { text: cleanText, heatmap: raw };
+  } catch {
+    return { text: cleanText, heatmap: null };
+  }
+}
+
+function extractSubsBreakdown(text) {
+  const block = findTaggedBlock(text, 'SUBS');
+  if (!block) return { text, subs: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, subs: null };
+    if (!Array.isArray(raw.items) || raw.items.length === 0 || raw.items.length > 12) {
+      return { text: cleanText, subs: null };
+    }
+    const valid = raw.items.every(it =>
+      typeof it?.name === 'string' && typeof it?.monthly === 'number'
+    );
+    if (!valid) return { text: cleanText, subs: null };
+    return { text: cleanText, subs: raw };
+  } catch {
+    return { text: cleanText, subs: null };
+  }
+}
+
+function extractTopMerchants(text) {
+  const block = findTaggedBlock(text, 'TOPMERCHANT');
+  if (!block) return { text, topMerchants: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, topMerchants: null };
+    if (!Array.isArray(raw.items) || raw.items.length === 0 || raw.items.length > 10) {
+      return { text: cleanText, topMerchants: null };
+    }
+    const valid = raw.items.every(it =>
+      typeof it?.name === 'string' && typeof it?.total === 'number'
+    );
+    if (!valid) return { text: cleanText, topMerchants: null };
+    return { text: cleanText, topMerchants: raw };
+  } catch {
+    return { text: cleanText, topMerchants: null };
+  }
+}
+
+function extractSavingsRate(text) {
+  const block = findTaggedBlock(text, 'SAVINGSRATE');
+  if (!block) return { text, savingsRate: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, savingsRate: null };
+    if (typeof raw.income !== 'number' || raw.income <= 0) return { text: cleanText, savingsRate: null };
+    if (typeof raw.saved !== 'number') return { text: cleanText, savingsRate: null };
+    return { text: cleanText, savingsRate: raw };
+  } catch {
+    return { text: cleanText, savingsRate: null };
+  }
+}
+
+function extractRecurringCalendar(text) {
+  const block = findTaggedBlock(text, 'RECCAL');
+  if (!block) return { text, recCal: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, recCal: null };
+    if (!Array.isArray(raw.charges)) return { text: cleanText, recCal: null };
+    const valid = raw.charges.every(c =>
+      typeof c?.day === 'number' && c.day >= 1 && c.day <= 31 &&
+      typeof c?.name === 'string' && typeof c?.amount === 'number'
+    );
+    if (!valid) return { text: cleanText, recCal: null };
+    return { text: cleanText, recCal: raw };
+  } catch {
+    return { text: cleanText, recCal: null };
+  }
+}
+
+function extractCategorySparklines(text) {
+  const block = findTaggedBlock(text, 'SPARKLINES');
+  if (!block) return { text, sparklines: null };
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
+    if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, sparklines: null };
+    if (!Array.isArray(raw.categories) || raw.categories.length === 0 || raw.categories.length > 10) {
+      return { text: cleanText, sparklines: null };
+    }
+    const valid = raw.categories.every(c =>
+      typeof c?.name === 'string' &&
+      Array.isArray(c?.values) && c.values.length >= 2 && c.values.length <= 24 &&
+      c.values.every(v => typeof v === 'number')
+    );
+    if (!valid) return { text: cleanText, sparklines: null };
+    return { text: cleanText, sparklines: raw };
+  } catch {
+    return { text: cleanText, sparklines: null };
+  }
+}
+
+function extractSimulator(text) {
+  const block = findTaggedBlock(text, 'SIMULATOR');
+  if (!block) return { text, simulator: null };
+
+  const cleanText = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  try {
+    const raw = JSON.parse(block.json.trim());
     if (!VALID_SIM_TYPES.has(raw.type)) return { text: cleanText, simulator: null };
     if (typeof raw.title !== 'string' || !raw.title) return { text: cleanText, simulator: null };
     if (!Array.isArray(raw.params) || raw.params.length === 0 || raw.params.length > 5) {
@@ -370,7 +535,9 @@ function pct(current, previous) {
   return (delta >= 0 ? '+' : '') + delta.toFixed(1) + '%';
 }
 
-function buildSystemPrompt(mode, nombre, data) {
+function buildSystemPrompt(mode, nombre, data, opts = {}) {
+  const useTools = !!opts.useTools;
+  const guardrails = buildSystemPromptGuardrails(nombre);
   const now = new Date();
   const fechaActual = now.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const fechaISO = now.toISOString().split('T')[0];
@@ -495,14 +662,13 @@ OTRAS REGLAS:
 
 === INSTRUCCIÓN DE WIDGET STREAK ===
 ORDEN OBLIGATORIO: PRIMERO el texto de explicación, DESPUÉS la racha AL FINAL.
-SOLO emite STREAK para rachas POSITIVAS (comportamientos deseables consecutivos), nunca para gaps o ausencias de algo bueno.
-IMPORTANTE: Siempre explica la racha CON TEXTO PRIMERO (al menos 1 oración), luego el widget AL FINAL.
-Casos válidos:
+SOLO emite [STREAK] para rachas POSITIVAS y NO TRIVIALES — current debe ser ≥ 1 día/aporte/etc. Si la racha es 0 o menos, NO emitas el widget; en su lugar responde solo con texto motivacional ("apenas empieza el mes, tu primera oportunidad de marcar racha es hoy").
+Casos válidos (current ≥ 1):
 - Días consecutivos SIN gasto en una categoría problemática.
 - Días consecutivos BAJO presupuesto en una categoría.
 - Aportaciones consecutivas a una meta.
 - Días consecutivos con saldo positivo.
-NO uses STREAK para: "X meses sin aportar a meta" (eso es un GAP, no una racha), "días desde el último ahorro", o cualquier cosa con connotación negativa.
+NO uses STREAK para: "meses sin aportar a meta" (es un GAP, desmotivador), o cualquier racha = 0.
 Formato:
 [STREAK]
 {"label":"Días sin gasto en restaurantes","current":7,"unit":"días","best":12,"icon":"🔥","context":"Tu récord histórico fue 12 días"}
@@ -536,7 +702,80 @@ FORMATO EXACTO (no omitas nada):
 ❌ NUNCA hagas esto: "[Titulo] Abril vs Marzo [Izquierda Etiqueta]..." sin los tags
 ✅ SIEMPRE: Explica una oración PRIMERO, luego el bloque [COMPARE] AL FINAL
 
-El frontend calcula y muestra el delta (% y absoluto) automáticamente. NO incluyas el delta en los datos.`;
+El frontend calcula y muestra el delta (% y absoluto) automáticamente. NO incluyas el delta en los datos.
+
+=== INSTRUCCIÓN DE WIDGET GAUGE (velocímetro) ===
+Úsalo cuando el usuario pregunte "¿voy bien con mi presupuesto?" o "¿cómo voy del mes?" — algo medible vs un objetivo. Texto PRIMERO, gauge AL FINAL.
+Formato:
+[GAUGE]
+{"title":"Presupuesto Restaurantes","value":1830,"max":2500,"unit":"MXN","label":"73% consumido","thresholds":{"warn":80,"bad":100}}
+[/GAUGE]
+- "value": valor actual (número). REQUERIDO.
+- "max": valor máximo / objetivo. REQUERIDO.
+- "unit": "MXN", "%", "días", etc. opcional.
+- "label": texto debajo del número grande, opcional.
+- "thresholds": {warn: %, bad: %} opcional. value/max × 100 < warn = verde, < bad = naranja, ≥ bad = rojo.
+
+=== INSTRUCCIÓN DE WIDGET HEATMAP (mapa de calor) ===
+Úsalo para mostrar intensidad por día/categoría/etiqueta — máximo ~30 celdas. Ideal para "¿qué días gasto más?" o "gasto por día del mes".
+Formato:
+[HEATMAP]
+{"title":"Gastos por día — abril","cells":[{"label":"L","value":150},{"label":"M","value":890},{"label":"X","value":420},{"label":"J","value":1200},{"label":"V","value":2300},{"label":"S","value":1800},{"label":"D","value":300}]}
+[/HEATMAP]
+- "cells": array de {label, value}. label = string corto (1-3 chars idealmente). value = intensidad numérica. REQUERIDO. Máx 70 celdas.
+- Las celdas se colorean automáticamente: 0 = blanco, max = rojo intenso.
+
+=== INSTRUCCIÓN DE WIDGET SUBS (desglose de suscripciones) ===
+Úsalo cuando el usuario pregunte "lista mis suscripciones" — más visual que tabla.
+Formato:
+[SUBS]
+{"title":"Tus suscripciones activas","items":[{"name":"Netflix","monthly":139,"annual":1668},{"name":"Gym Club","monthly":99,"annual":1188},{"name":"Spotify","monthly":12,"annual":144}],"total":250}
+[/SUBS]
+- "items": array de {name, monthly, annual?}. monthly REQUERIDO.
+- "total": total mensual de TODAS las items, opcional pero recomendado.
+- Se ordena por monthly desc automáticamente.
+
+=== INSTRUCCIÓN DE WIDGET TOPMERCHANT (top de comercios/lugares) ===
+Úsalo para "¿en qué lugares gasto más?" o "mis principales comercios".
+Formato:
+[TOPMERCHANT]
+{"title":"Top 5 lugares — abril","items":[{"name":"Starbucks","total":890,"count":12},{"name":"Uber","total":1500,"count":8},{"name":"Walmart","total":2300,"count":4}]}
+[/TOPMERCHANT]
+- "items": array de {name, total, count?}. name y total REQUERIDOS, count opcional (cantidad de transacciones).
+- Se ordena por total desc automáticamente.
+
+=== INSTRUCCIÓN DE WIDGET SAVINGSRATE (tasa de ahorro) ===
+Úsalo cuando el usuario pregunte "¿cuánto ahorro?", "tasa de ahorro", "qué tan bien ahorro" — muestra un anillo con el % de ingreso ahorrado vs benchmarks.
+Formato:
+[SAVINGSRATE]
+{"title":"Tu tasa de ahorro este mes","income":54000,"saved":9000,"benchmarks":{"good":10,"great":20,"excellent":30}}
+[/SAVINGSRATE]
+- "income": ingreso total del periodo. REQUERIDO, > 0.
+- "saved": monto ahorrado del periodo (puede ser negativo si gastó más que ingresó). REQUERIDO.
+- "benchmarks": opcional, % objetivos. Por defecto: good=10, great=20, excellent=30.
+- El widget calcula saved/income × 100 y colorea según benchmark alcanzado.
+
+=== INSTRUCCIÓN DE WIDGET RECCAL (calendario de cargos recurrentes) ===
+Úsalo para "¿qué cargos vienen este mes?", "calendario de pagos" — muestra un mes con marcas en los días de cargo.
+Formato:
+[RECCAL]
+{"title":"Cargos del mes","charges":[{"day":2,"name":"Renta","amount":6000},{"day":5,"name":"Netflix","amount":139},{"day":12,"name":"Gym","amount":99}]}
+[/RECCAL]
+- "charges": array de {day, name, amount}. day = día del mes (1-31). REQUERIDO.
+- Máximo 30 cargos.
+- El widget renderiza un mini calendario y resalta los días con cargos.
+
+=== INSTRUCCIÓN DE WIDGET SPARKLINES (mini-trends por categoría) ===
+Úsalo para "tendencia por categoría", "¿cómo han evolucionado mis gastos?" — lista categorías con mini-gráfico de tendencia al lado.
+Formato:
+[SPARKLINES]
+{"title":"Tendencia 6 meses","categories":[{"name":"Restaurantes","values":[1200,1450,1800,2100,2200,2370],"current":2370},{"name":"Transporte","values":[1900,1700,2000,2100,2150,2200],"current":2200}]}
+[/SPARKLINES]
+- "categories": array de {name, values[], current?}. values = serie temporal (mínimo 2, máximo 24 puntos).
+- Máximo 10 categorías.
+- El widget muestra cada categoría con su mini-línea, valor actual y % cambio vs primero.
+
+REGLA FINAL: emite UN widget por respuesta. Si la pregunta podría justificar dos, elige el más útil para esa pregunta específica.`;
 
   const brevityRules = `
 === REGLAS DE BREVEDAD (OBLIGATORIO) ===
@@ -546,7 +785,9 @@ El frontend calcula y muestra el delta (% y absoluto) automáticamente. NO inclu
 - NO incluyas frases motivacionales largas, despedidas elaboradas, ni preguntas de seguimiento.
 - Si el usuario quiere más detalle, lo pedirá.`;
 
-  const noToolsClause = `
+  const noToolsClause = useTools
+    ? `\nINSTRUCCIÓN DE HERRAMIENTAS:\n${SYSTEM_PROMPT_TOOL_PREAMBLE}\nEl contexto financiero abajo es solo un resumen; usa las herramientas para datos específicos o actualizados.\n${guardrails}`
+    : `
 IMPORTANTE - NO TIENES ACCESO A HERRAMIENTAS:
 - No tienes acceso a funciones, APIs, o herramientas que ejecutar.
 - No llames a funciones ni hagas llamadas a herramientas.
@@ -619,91 +860,202 @@ router.post('/', async (req, res) => {
   res.flushHeaders?.();
 
   const send = (type, payload = {}) => {
-    res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+    if (res.writableEnded || res.destroyed) return;
+    try {
+      res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+    } catch {
+      // EPIPE / ECONNRESET if the socket died between the guard and the write;
+      // safe to swallow because the abort handler will tear down the LLM call.
+    }
   };
 
   const abort = new AbortController();
-  req.on('close', () => abort.abort());
+  // Listen on the *response* (not the request): in Express 5 / Node 20+,
+  // `req.on('close')` fires immediately when the request body finishes (which
+  // is right away here, since express.json() has already buffered it). We only
+  // want to abort the LLM call when the *client* disconnects mid-stream, which
+  // is what `res.on('close')` before `res.writableEnded` indicates.
+  res.on('close', () => {
+    if (!res.writableEnded) abort.abort();
+  });
+  // Swallow socket errors so a mid-stream client disconnect doesn't crash the
+  // process with an unhandled 'error' event on the response.
+  res.on('error', () => { /* */ });
 
   try {
     const nombre = `${req.usuario.nombre} ${req.usuario.apellido}`;
-    const financialData = await fetchUserFinancialData(req.usuario.id_usuario);
-    financialData.forecast = calculateForecast(financialData);
-    const systemPrompt = buildSystemPrompt(mode, nombre, financialData);
+    const wantsAgent = !!(aiProvider.capabilities?.supportsTools && typeof aiProvider.generateWithTools === 'function');
+    const allowWrites = !!aiProvider.capabilities?.supportsToolCalling;
 
-    if (typeof aiProvider.generateStream !== 'function') {
+    // Run prefetch + tool-context build in parallel — both hit Supabase and
+    // are independent. Saves ~one round-trip vs the previous sequential await.
+    // The agent path still wants the financialData to seed the system prompt
+    // so simple "how much did I spend" questions can be answered without
+    // calling tools at all.
+    const [financialData, registry] = await Promise.all([
+      fetchUserFinancialData(req.usuario.id_usuario),
+      wantsAgent
+        ? buildToolRegistry({
+            supabase,
+            id_usuario: req.usuario.id_usuario,
+            opts: { includeWrites: allowWrites, send },
+          })
+        : Promise.resolve(null),
+    ]);
+    financialData.forecast = calculateForecast(financialData);
+
+    const systemPrompt = buildSystemPrompt(mode, nombre, financialData, { useTools: wantsAgent });
+
+    if (typeof aiProvider.generateStream !== 'function' && !wantsAgent) {
       throw new Error(`Proveedor ${aiProvider.name} no soporta streaming`);
     }
 
     let fullText = '';
-    let emittedUpTo = 0;
-    let blockCutoff = -1;
 
-    for await (const chunk of aiProvider.generateStream({
-      systemPrompt, history, message, signal: abort.signal,
-    })) {
-      if (res.writableEnded || abort.signal.aborted) break;
-      fullText += chunk;
+    if (wantsAgent) {
+      // Agent loop path: provider can call tools. We don't get incremental text
+      // deltas (Gemini's tool-loop is request/response per turn), so we emit a
+      // status event and then deliver the final text in one shot.
+      send('status', { text: 'Pensando…' });
+      // True streaming: each text token from Gemini is forwarded to the client
+      // as a delta. Tool-call iterations don't produce text, so the user sees
+      // tokens only on the final reply turn (which is what they care about).
+      let streamedText = '';
+      const result = await runAgentLoop({
+        provider: aiProvider,
+        registry,
+        systemPrompt,
+        history,
+        message,
+        send,
+        signal: abort.signal,
+        onTextDelta: (delta) => {
+          if (!delta) return;
+          streamedText += delta;
+          send('delta', { text: delta });
+        },
+      });
+      if (result.aborted) return;
+      fullText = result.text || '';
+      // If the streaming path yielded nothing (e.g., provider used the non-
+      // streaming fallback) and we still have a final text, flush it as one
+      // delta so the frontend never ends up empty.
+      if (!streamedText && fullText) send('delta', { text: fullText });
+    } else {
+      // Streaming-only path (Ollama or any provider lacking tool calling).
+      let emittedUpTo = 0;
+      let blockCutoff = -1;
 
-      if (blockCutoff === -1) {
-        const idx = findEarliestMarker(fullText);
-        if (idx !== -1) {
-          const toEmit = fullText.slice(emittedUpTo, idx);
-          if (toEmit) send('delta', { text: toEmit });
-          blockCutoff = idx;
-          emittedUpTo = idx;
-        } else {
-          const safe = Math.max(emittedUpTo, fullText.length - SAFE_BUFFER);
-          if (safe > emittedUpTo) {
-            send('delta', { text: fullText.slice(emittedUpTo, safe) });
-            emittedUpTo = safe;
+      for await (const chunk of aiProvider.generateStream({
+        systemPrompt, history, message, signal: abort.signal,
+      })) {
+        if (res.writableEnded || abort.signal.aborted) break;
+        fullText += chunk;
+
+        if (blockCutoff === -1) {
+          const idx = findEarliestMarker(fullText);
+          if (idx !== -1) {
+            const toEmit = fullText.slice(emittedUpTo, idx);
+            if (toEmit) send('delta', { text: toEmit });
+            blockCutoff = idx;
+            emittedUpTo = idx;
+          } else {
+            const safe = Math.max(emittedUpTo, fullText.length - SAFE_BUFFER);
+            if (safe > emittedUpTo) {
+              send('delta', { text: fullText.slice(emittedUpTo, safe) });
+              emittedUpTo = safe;
+            }
           }
         }
       }
-    }
 
-    if (blockCutoff === -1 && emittedUpTo < fullText.length) {
-      send('delta', { text: fullText.slice(emittedUpTo) });
+      if (blockCutoff === -1 && emittedUpTo < fullText.length) {
+        send('delta', { text: fullText.slice(emittedUpTo) });
+      }
     }
 
     const afterChart = extractChart(fullText);
     const afterSim = extractSimulator(afterChart.text);
     const afterStreak = extractStreak(afterSim.text);
     const afterCompare = extractCompare(afterStreak.text);
-    const reply = afterCompare.text;
+    const afterGauge = extractGauge(afterCompare.text);
+    const afterHeatmap = extractHeatmap(afterGauge.text);
+    const afterSubs = extractSubsBreakdown(afterHeatmap.text);
+    const afterMerch = extractTopMerchants(afterSubs.text);
+    const afterSav = extractSavingsRate(afterMerch.text);
+    const afterRecCal = extractRecurringCalendar(afterSav.text);
+    const afterSpark = extractCategorySparklines(afterRecCal.text);
+    const reply = afterSpark.text;
     const chart = afterChart.chart;
     const simulator = afterSim.simulator;
     const streak = afterStreak.streak;
     const compare = afterCompare.compare;
+    const gauge = afterGauge.gauge;
+    const heatmap = afterHeatmap.heatmap;
+    const subs = afterSubs.subs;
+    const topMerchants = afterMerch.topMerchants;
+    const savingsRate = afterSav.savingsRate;
+    const recCal = afterRecCal.recCal;
+    const sparklines = afterSpark.sparklines;
 
-    const SAVINGS_INTENT_RE = /ahorr|meta|aport|guardar|fondo|inversi|presupuest|alcanza|object/i;
-    const showActions = mode === 'coach' && SAVINGS_INTENT_RE.test(message);
-    const actions = showActions ? suggestCoachActions(financialData, message) : [];
+    // Build new structured widgets[] envelope alongside the legacy fields. The
+    // frontend (post PR 2) consumes widgets[] preferentially; legacy fields
+    // remain for back-compat until the cleanup PR.
+    const widgets = [];
+    if (chart) widgets.push({ kind: 'chart', chart });
+    if (simulator) widgets.push({ kind: 'simulator', simulator });
+    if (streak) widgets.push({ kind: 'streak', streak });
+    if (compare) widgets.push({ kind: 'compare', compare });
+    if (gauge) widgets.push({ kind: 'gauge', gauge });
+    if (heatmap) widgets.push({ kind: 'heatmap', heatmap });
+    if (subs) widgets.push({ kind: 'subs', subs });
+    if (topMerchants) widgets.push({ kind: 'topMerchants', topMerchants });
+    if (savingsRate) widgets.push({ kind: 'savingsRate', savingsRate });
+    if (recCal) widgets.push({ kind: 'recCal', recCal });
+    if (sparklines) widgets.push({ kind: 'sparklines', sparklines });
 
-    const SUB_INTENT_RE = /suscrip|recurrent|cancel|netflix|spotify|cobro.*mes|cu[aá]nto.*pago.*mes|servic.*(mensual|recurrent)/i;
+    // Legacy keyword-based intent detection. Only used on the non-agent path
+    // (Ollama / providers without tool calling). With the agent loop, Gemini
+    // detects intent semantically and proposes actions via `proponer_aporte_meta`
+    // and emits subscription widgets via [SUBS] when relevant.
+    let actions = [];
     let subscriptionAudit = null;
-    if (SUB_INTENT_RE.test(message)) {
-      const recs = (financialData.recurrenciasRaw || []).filter(r => r.tipo?.toLowerCase() === 'gasto');
-      const items = recs
-        .map(r => ({
-          descripcion: r.descripcion,
-          monthly: Math.abs(Number(r.monto)),
-          annual: Math.abs(Number(r.monto)) * 12,
-          dia_del_mes: r.dia_del_mes,
-        }))
-        .sort((a, b) => b.annual - a.annual);
-      const totalMonthly = items.reduce((acc, i) => acc + i.monthly, 0);
-      subscriptionAudit = {
-        items,
-        totalMonthly,
-        totalAnnual: totalMonthly * 12,
-      };
+    if (!wantsAgent) {
+      const SAVINGS_INTENT_RE = /ahorr|meta|aport|guardar|fondo|inversi|presupuest|alcanza|object/i;
+      const showActions = mode === 'coach' && SAVINGS_INTENT_RE.test(message);
+      actions = showActions ? suggestCoachActions(financialData, message) : [];
+
+      const SUB_INTENT_RE = /suscrip|recurrent|cancel|netflix|spotify|cobro.*mes|cu[aá]nto.*pago.*mes|servic.*(mensual|recurrent)/i;
+      if (SUB_INTENT_RE.test(message)) {
+        const recs = (financialData.recurrenciasRaw || []).filter(r => r.tipo?.toLowerCase() === 'gasto');
+        const items = recs
+          .map(r => ({
+            descripcion: r.descripcion,
+            monthly: Math.abs(Number(r.monto)),
+            annual: Math.abs(Number(r.monto)) * 12,
+            dia_del_mes: r.dia_del_mes,
+          }))
+          .sort((a, b) => b.annual - a.annual);
+        const totalMonthly = items.reduce((acc, i) => acc + i.monthly, 0);
+        subscriptionAudit = {
+          items,
+          totalMonthly,
+          totalAnnual: totalMonthly * 12,
+        };
+      }
     }
     const tarjetas = mode === 'coach'
       ? financialData.tarjetasRaw.map(t => ({ id: t.id_tarjeta, nombre: t.nombre }))
       : [];
 
-    send('done', { reply, chart, simulator, streak, compare, subscriptionAudit, actions, tarjetas, provider: aiProvider.name });
+    send('done', {
+      reply, chart, simulator, streak, compare,
+      gauge, heatmap, subs, topMerchants, savingsRate, recCal, sparklines,
+      widgets,
+      subscriptionAudit, actions, tarjetas,
+      provider: aiProvider.name,
+      capabilities: aiProvider.capabilities || null,
+    });
     res.end();
   } catch (error) {
     if (!abort.signal.aborted) {
@@ -716,8 +1068,144 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Action proposal confirmation flow
+// ─────────────────────────────────────────────────────────────────────────────
+const proposalStore = require('../utils/agent/proposalStore');
+const { buildAgentContext } = require('../utils/tools/context');
+const { buildWriteSchemas } = require('../utils/tools/writeTools');
+const { aportarMeta, createMeta } = require('./metas');
+const { upsertPresupuesto } = require('./presupuestos');
+const { togglearRecurrencia } = require('./recurrencias');
+
+async function executeProposal(proposal, ctx) {
+  const { action, params } = proposal;
+  switch (action) {
+    case 'proponer_aporte_meta':
+      return await aportarMeta(
+        { supabase: ctx.supabase, id_usuario: ctx.id_usuario },
+        { id_meta: params.id_meta, monto: params.monto, id_tarjeta: params.id_tarjeta }
+      );
+    case 'proponer_crear_presupuesto':
+      return await upsertPresupuesto(
+        { supabase: ctx.supabase, id_usuario: ctx.id_usuario },
+        { id_categoria: params.id_categoria, monto: params.monto }
+      );
+    case 'proponer_modificar_presupuesto': {
+      const presup = ctx.presupuestosById.get(params.id_presupuesto);
+      if (!presup) return { ok: false, status: 404, error: 'Presupuesto no encontrado' };
+      return await upsertPresupuesto(
+        { supabase: ctx.supabase, id_usuario: ctx.id_usuario },
+        { id_categoria: presup.id_categoria, monto: params.monto_nuevo }
+      );
+    }
+    case 'proponer_toggle_recurrencia':
+      return await togglearRecurrencia(
+        { supabase: ctx.supabase, id_usuario: ctx.id_usuario },
+        { id: params.id_recurrencia, activo: params.activo }
+      );
+    case 'proponer_crear_meta':
+      return await createMeta(
+        { supabase: ctx.supabase, id_usuario: ctx.id_usuario },
+        { nombre: params.nombre, meta: params.monto_objetivo, fecha: params.fecha_limite }
+      );
+    default:
+      return { ok: false, status: 400, error: `Unknown action: ${action}` };
+  }
+}
+
+router.post('/confirm-action', async (req, res) => {
+  const { proposal_id, additional_params = {} } = req.body || {};
+  if (!proposal_id || typeof proposal_id !== 'string') {
+    return res.status(400).json({ error: 'proposal_id requerido' });
+  }
+  const id_usuario = req.usuario.id_usuario;
+
+  // Synchronously claim the proposal so concurrent confirm requests for the
+  // same proposal_id can't both pass validation and double-execute. Released
+  // on validation failure; deleted on success.
+  const claim = proposalStore.tryClaim(proposal_id, id_usuario);
+  if (!claim.ok) {
+    return res.status(claim.status || 400).json({ error: claim.error });
+  }
+  const proposal = claim.proposal;
+
+  // Defense-in-depth: re-validate the merged params against the same zod schema
+  // the write tool used at proposal time. The model can't tamper with params,
+  // but the user (or a malicious client) could pass bogus additional_params
+  // for fields like id_tarjeta.
+  try {
+    const ctx = await buildAgentContext({ supabase, id_usuario });
+    const schemas = buildWriteSchemas(ctx);
+    const schema = schemas[proposal.action];
+    if (!schema) {
+      proposalStore.release(proposal_id);
+      return res.status(400).json({ error: `Schema not found for ${proposal.action}` });
+    }
+
+    const merged = { ...proposal.params, ...additional_params };
+    const parsed = schema.safeParse(merged);
+    if (!parsed.success) {
+      proposalStore.release(proposal_id);
+      const issue = parsed.error.issues[0];
+      return res.status(400).json({
+        error: 'Validation failed',
+        detail: `${issue?.path?.join('.') || ''}: ${issue?.message || ''}`.trim(),
+      });
+    }
+    proposal.params = parsed.data;
+
+    const consumed = proposalStore.consume(proposal_id, id_usuario);
+    if (!consumed.ok) {
+      return res.status(consumed.status || 409).json({ error: consumed.error });
+    }
+
+    const result = await executeProposal(proposal, ctx);
+    if (result && result.ok === false) {
+      auditLog.record({
+        id_usuario,
+        action: proposal.action,
+        status: 'failed',
+        params: proposal.params,
+        error_message: result.error || 'unknown',
+      });
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    auditLog.record({
+      id_usuario,
+      action: proposal.action,
+      status: 'success',
+      params: proposal.params,
+      result_summary: typeof result === 'object' ? JSON.stringify(result).slice(0, 500) : String(result),
+    });
+    return res.json({ executed: true, action: proposal.action, result: result?.data ?? result });
+  } catch (err) {
+    proposalStore.release(proposal_id);
+    logger.error('confirm-action failed', { id_usuario, action: proposal.action, message: err.message });
+    auditLog.record({
+      id_usuario,
+      action: proposal.action,
+      status: 'failed',
+      params: proposal.params,
+      error_message: err.message,
+    });
+    return res.status(500).json({ error: 'Error al ejecutar la acción' });
+  }
+});
+
+router.post('/cancel-action', async (req, res) => {
+  const { proposal_id } = req.body || {};
+  if (!proposal_id || typeof proposal_id !== 'string') {
+    return res.status(400).json({ error: 'proposal_id requerido' });
+  }
+  const r = proposalStore.cancel(proposal_id, req.usuario.id_usuario);
+  if (!r.ok) return res.status(r.status || 400).json({ error: r.error });
+  return res.json({ cancelled: true });
+});
+
 module.exports = router;
 module.exports.extractChart = extractChart;
 module.exports.extractSimulator = extractSimulator;
 module.exports.extractStreak = extractStreak;
 module.exports.extractCompare = extractCompare;
+module.exports.executeProposal = executeProposal;

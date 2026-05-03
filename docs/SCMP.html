@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>SCMP — FinanceSmart</title>
+<style>
+  @page { size: Letter; margin: 18mm 16mm; }
+  :root {
+    --fg: #1a1a1a;
+    --muted: #555;
+    --accent: #c8102e;
+    --accent-soft: #f4d3d8;
+    --border: #d8d8d8;
+    --code-bg: #f6f6f6;
+    --table-stripe: #fafafa;
+    --table-head: #f0f0f0;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: white; color: var(--fg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    margin: 0;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.2; margin: 1.4em 0 0.5em; page-break-after: avoid; }
+  h1 {
+    font-size: 22pt;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 0.25em;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 16pt;
+    color: var(--accent);
+    border-bottom: 1px solid var(--accent-soft);
+    padding-bottom: 0.2em;
+    margin-top: 1.6em;
+  }
+  h3 { font-size: 13pt; color: #333; }
+  h4 { font-size: 11.5pt; color: #444; font-weight: 600; }
+  p { margin: 0.5em 0; orphans: 3; widows: 3; }
+  ul, ol { margin: 0.4em 0 0.6em 1.2em; padding: 0; }
+  li { margin: 0.15em 0; }
+  blockquote {
+    margin: 0.6em 0;
+    padding: 0.4em 0.9em;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    color: #4a1a22;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
+  }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 9.5pt;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.7em 0.9em;
+    overflow: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: transparent; padding: 0; font-size: 9pt; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.7em 0 1em;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  thead th { background: var(--table-head); font-weight: 600; }
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .cover {
+    page-break-after: always;
+    text-align: center;
+    padding-top: 35vh;
+  }
+  .cover h1 { border: 0; font-size: 32pt; }
+  .cover .sub { color: var(--muted); font-size: 14pt; margin-top: 0.4em; }
+  .cover .meta { margin-top: 4em; font-size: 11pt; color: var(--muted); }
+</style>
+</head>
+<body>
+<section class="cover">
+  <h1>Plan de Gestión de la Configuración de Software</h1>
+  <div class="sub">Proyecto FinanceSmart</div>
+  <div class="meta">
+    Versión 1.0 · 3 de mayo de 2026<br/>
+    Repositorio GitHub — FinanceSmart
+  </div>
+</section>
+<h1>Plan de Gestión de la Configuración de Software (SCMP)</h1>
+<h2>Proyecto: FinanceSmart</h2>
+<p><strong>Versión:</strong> 1.0 <strong>Fecha:</strong> 2026-05-03 <strong>Repositorio:</strong> GitHub — <code>FinanceSmart</code> <strong>Rama principal:</strong> <code>main</code></p>
+<hr/>
+<h2>1. Aplicación Metodología y Gestión de Proyectos (M1)</h2>
+<h3>1.1 Introducción</h3>
+<h4>Propósito del SCMP</h4>
+<p>Este documento define cómo el equipo de FinanceSmart identifica, controla, audita y libera todos los elementos de configuración del software (código fuente, documentación, dependencias, datos de prueba, infraestructura como código y artefactos de despliegue). Su finalidad es:</p>
+<ul><li>Garantizar que cualquier versión del producto sea <strong>reproducible</strong> por cualquier integrante del equipo.</li><li>Evitar regresiones mediante un flujo de control de cambios disciplinado.</li><li>Dar trazabilidad entre requerimientos del socio formador, commits, pruebas y releases.</li><li>Proteger la calidad del producto entregado al socio formador en cada sprint.</li></ul>
+<h4>Alcance</h4>
+<p><strong>Incluye:</strong></p>
+<ul><li>Código fuente del frontend (React 19 + Vite) en <code>frontend/</code>.</li><li>Código fuente del backend (Node.js + Express 5) en <code>backend/</code>.</li><li>Esquemas y migraciones de base de datos Supabase (PostgreSQL).</li><li>Scripts de seed (<code>backend/scripts/seed-sofia.js</code>).</li><li>Pruebas unitarias (Jest), de integración y de regresión contra LLM real.</li><li>Configuración de despliegue en Vercel (<code>vercel.json</code>).</li><li>Workflows de CI/CD en <code>.github/workflows/</code>.</li><li>Documentación técnica (<code>docs/</code>, <code>SEED_SOFIA_README.md</code>).</li><li>Variables de entorno y secretos (gestionados fuera del repo).</li></ul>
+<p><strong>No incluye:</strong></p>
+<ul><li>Datos personales reales de usuarios productivos (sólo cuentas demo como Sofía).</li><li>Infraestructura externa de Supabase (gestionada por su panel).</li><li>Llaves de API de proveedores LLM (Gemini, Ollama) — sólo se documentan referencias.</li></ul>
+<h4>Definiciones clave</h4>
+<table><thead><tr><th>Término</th><th>Definición</th></tr></thead><tbody><tr><td><strong>Elemento de configuración (CI)</strong></td><td>Cualquier artefacto bajo control de versiones que afecte el comportamiento del sistema.</td></tr><tr><td><strong>Baseline</strong></td><td>Versión etiquetada y aprobada del producto, lista para despliegue o demo al socio.</td></tr><tr><td><strong>Pull Request (PR)</strong></td><td>Mecanismo de propuesta de cambio en GitHub que activa revisión + CI.</td></tr><tr><td><strong>Sprint</strong></td><td>Iteración de 2 semanas alineada con el calendario académico del Reto.</td></tr><tr><td><strong>Release</strong></td><td>Despliegue a producción tagueado con versión semántica (ej. <code>v1.2.0</code>).</td></tr><tr><td><strong>Hotfix</strong></td><td>Cambio urgente directo sobre <code>main</code> que corrige un defecto crítico en producción.</td></tr><tr><td><strong>Regresión</strong></td><td>Suite de prompts + assertions que valida que el chatbot no alucine ni rompa contratos.</td></tr></tbody></table>
+<hr/>
+<h3>1.2 Gestión de la Configuración</h3>
+<h4>Roles y responsabilidades del equipo</h4>
+<table><thead><tr><th>Integrante</th><th>Rol primario</th><th>Responsabilidades de configuración</th></tr></thead><tbody><tr><td><strong>Oscar</strong></td><td>Líder técnico / Backend &amp; Agentic AI</td><td>Aprueba PRs al backend; mantiene el contrato de tools del agente; gestiona la rama <code>main</code>; etiqueta releases.</td></tr><tr><td><strong>Jorge</strong></td><td>Frontend / Despliegue Web</td><td>Mantiene <code>frontend/</code>; aprueba PRs de UI; configura Vercel y monitorea builds de producción.</td></tr><tr><td><strong>Elvia</strong></td><td>Reto / Integración IA</td><td>Custodia de prompts, fixtures y suite de regresión; coordina demos con el socio.</td></tr><tr><td><strong>Frumen</strong></td><td>Diseño</td><td>Custodia de wireframes y guía visual; valida cambios de UX antes de merge.</td></tr><tr><td><strong>Iliana</strong></td><td>Calidad</td><td>Define criterios de aceptación; revisa cobertura de pruebas (Jest + Vitest); audita conformidad.</td></tr><tr><td><strong>Luis</strong></td><td>Base de datos</td><td>Custodia del esquema PostgreSQL; revisa toda migración; valida normalización (3NF).</td></tr></tbody></table>
+<blockquote>Cualquier merge a <code>main</code> requiere aprobación del responsable del área tocada (backend → Oscar, frontend → Jorge, BD → Luis, etc.).</blockquote>
+<h4>Políticas de control de cambios</h4>
+<ol><li><strong>Toda modificación pasa por Pull Request.</strong> Está prohibido empujar directamente a <code>main</code>.</li><li><strong>Convención de commits</strong>: encabezado descriptivo en imperativo (<code>Fix: …</code>, <code>Add: …</code>, <code>UI: …</code>, <code>Refactor: …</code>). Mensajes en español o inglés, consistentes dentro del PR.</li><li><strong>Mínimo 1 revisor</strong> por PR antes de merge; <strong>2 revisores</strong> si toca esquema BD o flujo de pago/auth.</li><li><strong>CI obligatoria en verde</strong> (<code>ci.yml</code>) antes de habilitar el botón de merge.</li><li><strong>Cambios destructivos</strong> (drop de tablas, borrado de datos) requieren respaldo previo y aprobación del líder técnico.</li><li><strong>Secretos jamás se commitean.</strong> Se usan <code>.env</code> locales y Vercel Environment Variables en producción. El repo incluye <code>.env.example</code> como plantilla.</li></ol>
+<h4>Herramientas seleccionadas</h4>
+<table><thead><tr><th>Categoría</th><th>Herramienta</th><th>Justificación</th></tr></thead><tbody><tr><td>Control de versiones</td><td><strong>Git + GitHub</strong></td><td>Estándar de la industria; integración nativa con Vercel y Actions.</td></tr><tr><td>Gestión de tareas</td><td><strong>GitHub Projects / Issues</strong></td><td>Trazabilidad ticket↔commit↔PR sin herramienta extra.</td></tr><tr><td>CI/CD</td><td><strong>GitHub Actions</strong> + <strong>Vercel</strong></td><td>Automatización gratuita; despliegue cero-config en Vercel.</td></tr><tr><td>Pruebas</td><td><strong>Jest</strong> (backend), <strong>Vitest</strong> (frontend planeado), suite de <strong>regresión</strong> propia</td><td>Estándar Node; regresión propia para alucinaciones del LLM.</td></tr><tr><td>Comunicación</td><td><strong>WhatsApp</strong> (operativa) + <strong>Sesiones de Reto</strong> (formales)</td><td>Bajo overhead; sesiones documentadas para acta.</td></tr><tr><td>Base de datos</td><td><strong>Supabase (Postgres)</strong></td><td>PaaS con auth, RLS y dashboard incluidos.</td></tr></tbody></table>
+<hr/>
+<h3>1.3 Actividades de Configuración</h3>
+<h4>Identificación de elementos controlados</h4>
+<table><thead><tr><th>Tipo</th><th>Ubicación</th><th>Política</th></tr></thead><tbody><tr><td>Código backend</td><td><code>backend/**/*.js</code></td><td>Versionado completo; PR obligatorio.</td></tr><tr><td>Código frontend</td><td><code>frontend/src/**</code></td><td>Versionado completo; PR obligatorio.</td></tr><tr><td>Migraciones BD</td><td><code>backend/migrations/*.sql</code></td><td>Inmutables una vez en <code>main</code>; cambios sólo vía nueva migración.</td></tr><tr><td>Seed de demo</td><td><code>backend/scripts/seed-sofia.js</code></td><td>Versionado; cambios documentados en <code>SEED_SOFIA_README.md</code>.</td></tr><tr><td>Pruebas</td><td><code>backend/__tests__/<strong></code>, <code>backend/regression/</strong></code></td><td>Toda PR que cambie código de negocio debe ajustar/añadir pruebas.</td></tr><tr><td>Documentación</td><td><code>docs/</code>, <code>*.md</code> raíz</td><td>Versionada; revisada en PR.</td></tr><tr><td>Configuración despliegue</td><td><code>vercel.json</code>, <code>.github/workflows/*.yml</code></td><td>Cambios revisados por líder técnico + responsable de despliegue.</td></tr><tr><td>Dependencias</td><td><code>package.json</code> + <code>package-lock.json</code></td><td><code>npm install</code> siempre con <code>--save-exact</code> o respetando rango ya definido; lock se commitea.</td></tr><tr><td>Variables de entorno</td><td><code>.env.example</code> (plantilla), Vercel UI (valores)</td><td>Valores reales nunca en repo.</td></tr></tbody></table>
+<h4>Flujo de control de cambios</h4>
+<pre><code>1. Crear issue (descripción + criterios de aceptación)
+         ↓
+2. Crear rama desde main: feature/&lt;short-name&gt; | fix/&lt;bug-id&gt; | chore/&lt;task&gt;
+         ↓
+3. Desarrollar + commits atómicos + pruebas locales (npm test)
+         ↓
+4. Push a origin → abrir Pull Request
+         ↓
+5. CI ejecuta: lint + jest + build  (.github/workflows/ci.yml)
+         ↓                          ↓ (si falla)
+   ✅ verde            ❌ corregir + re-push
+         ↓
+6. Revisión por par (mínimo 1 aprobación)
+         ↓
+7. Merge a main (squash-merge preferido para historial limpio)
+         ↓
+8. Despliegue automático a Vercel (preview en PR; producción en main)
+         ↓
+9. Cierre del issue con referencia al commit/PR</code></pre>
+<h4>Seguimiento de estado (versionado)</h4>
+<ul><li><strong>Esquema SemVer</strong>: <code>MAJOR.MINOR.PATCH</code> (<code>v1.2.3</code>).</li></ul>
+<p>  - <code>MAJOR</code>: cambio incompatible en API pública (ej. cambio de contrato del endpoint <code>/api/chatbot</code>).   - <code>MINOR</code>: nueva funcionalidad retrocompatible (ej. nuevo widget del chatbot).   - <code>PATCH</code>: corrección de bug sin cambio de comportamiento.</p>
+<ul><li><strong>Tags Git</strong> marcan cada release: <code>git tag -a v1.2.0 -m "Sprint 4 release"</code>.</li><li><strong>CHANGELOG.md</strong> se actualiza por release con sección <code>Added / Changed / Fixed / Removed</code>.</li><li><strong>Branch protection</strong>: <code>main</code> requiere PR + status checks + 1 review.</li></ul>
+<h4>Auditorías</h4>
+<table><thead><tr><th>Frecuencia</th><th>Tipo de auditoría</th><th>Responsable</th><th>Verifica</th></tr></thead><tbody><tr><td>Cada PR</td><td>Revisión de código</td><td>Revisor asignado</td><td>Cumplimiento de convenciones, pruebas, seguridad básica.</td></tr><tr><td>Semanal</td><td>Revisión de issues abiertos vs. PRs</td><td>Líder técnico</td><td>Que ningún cambio quede huérfano sin merge ni cierre.</td></tr><tr><td>Por sprint</td><td>Auditoría de baseline</td><td>Calidad (Iliana)</td><td>Que la versión etiquetada para demo corresponda exactamente al commit en <code>main</code> y que CI haya pasado.</td></tr><tr><td>Por release</td><td>Auditoría de configuración</td><td>Líder técnico + Calidad</td><td>Que <code>package-lock.json</code>, migraciones aplicadas y variables de entorno en Vercel estén alineadas con el release.</td></tr><tr><td>Mensual</td><td>Auditoría de dependencias</td><td>Backend / Frontend</td><td><code>npm audit</code> + revisión de licencias y CVEs.</td></tr></tbody></table>
+<hr/>
+<h3>1.4 Herramientas y Recursos</h3>
+<h4>Herramientas específicas</h4>
+<ul><li><strong>Git</strong> ≥ 2.40 (cliente local).</li><li><strong>GitHub</strong> (repositorio remoto, Actions, Issues, Projects).</li><li><strong>GitHub Actions</strong> (CI/CD) con runners ubuntu-latest.</li><li><strong>Vercel</strong> (despliegue frontend + funciones serverless del backend).</li><li><strong>Supabase Dashboard</strong> (administración de BD, auth, storage).</li><li><strong>Node.js 20 LTS</strong> (entorno de ejecución).</li><li><strong>npm</strong> (gestor de paquetes; <code>package-lock.json</code> versionado).</li><li><strong>Jest 30</strong> (pruebas backend).</li><li><strong>ESLint + Prettier</strong> (calidad de código frontend).</li></ul>
+<h4>Estrategia de ramas</h4>
+<p>Se sigue una variante simplificada de <strong>trunk-based + feature branches</strong>:</p>
+<pre><code>main ──●──●──●──●──●──●──●──── (rama protegida, siempre desplegable)
+        \    \    \         /
+         \    \    feature/proactive-insights
+          \    fix/chatbot-stream-close
+           feature/agentic-rebuild</code></pre>
+<table><thead><tr><th>Tipo de rama</th><th>Patrón</th><th>Vida útil</th><th>Origen</th><th>Destino</th></tr></thead><tbody><tr><td>Feature</td><td><code>feature/&amp;lt;nombre&amp;gt;</code></td><td>Hasta merge</td><td><code>main</code></td><td><code>main</code> (PR)</td></tr><tr><td>Bugfix</td><td><code>fix/&amp;lt;id-o-nombre&amp;gt;</code></td><td>Hasta merge</td><td><code>main</code></td><td><code>main</code> (PR)</td></tr><tr><td>Chore</td><td><code>chore/&amp;lt;tarea&amp;gt;</code></td><td>Hasta merge</td><td><code>main</code></td><td><code>main</code> (PR)</td></tr><tr><td>Hotfix</td><td><code>hotfix/&amp;lt;id&amp;gt;</code></td><td>Horas</td><td><code>main</code> (tag de prod)</td><td><code>main</code> (PR urgente)</td></tr><tr><td>Experimentos</td><td><code>spike/&amp;lt;idea&amp;gt;</code></td><td>Sin garantía de merge</td><td><code>main</code></td><td>descartable</td></tr></tbody></table>
+<blockquote>Ramas históricas activas en este proyecto: <code>Oscar</code>, <code>AgentTest2</code> (rebuild agentic). Tras cierre de cada sprint las ramas mergeadas se eliminan.</blockquote>
+<h4>Normas de uso</h4>
+<ul><li><strong>Nombre de rama</strong> en kebab-case, prefijado por tipo.</li><li><strong>Rebase preferido sobre merge</strong> para mantener historial lineal cuando la rama es propia.</li><li><strong>No commitear binarios pesados</strong> (&gt;10 MB). Usar Vercel Blob o Supabase Storage.</li><li><strong>No commitear</strong> <code>.env</code>, <code>node_modules/</code>, <code>dist/</code>, claves o tokens.</li><li><strong>Co-autoría documentada</strong> con <code>Co-Authored-By:</code> cuando aplica.</li></ul>
+<h4>Infraestructura</h4>
+<table><thead><tr><th>Capa</th><th>Plataforma</th><th>Notas</th></tr></thead><tbody><tr><td>Frontend</td><td><strong>Vercel</strong> (Static + Edge)</td><td>Despliegue automático por commit a <code>main</code>.</td></tr><tr><td>Backend (API)</td><td><strong>Vercel Functions</strong> (Node.js, Fluid Compute)</td><td>Definido en <code>api/index.js</code> enrutando a Express.</td></tr><tr><td>Base de datos</td><td><strong>Supabase Postgres</strong></td><td>RLS habilitado; backups automáticos diarios del proveedor.</td></tr><tr><td>Almacenamiento de imágenes</td><td><strong>Vercel Blob</strong> (planeado)</td><td>Para futuros adjuntos de movimientos.</td></tr><tr><td>LLM principal</td><td><strong>Google Gemini 2.5 Flash</strong> vía API</td><td>Llave en variable <code>GEMINI_API_KEY</code>.</td></tr><tr><td>LLM fallback</td><td><strong>Ollama</strong> (<code>qwen2.5:7b</code>) self-hosted</td><td>Sólo desarrollo/demo offline.</td></tr><tr><td>CI</td><td><strong>GitHub Actions</strong> (<code>.github/workflows/ci.yml</code>)</td><td>Lint + Jest + build en cada PR.</td></tr><tr><td>Regresión LLM</td><td><strong>GitHub Actions</strong> programado (<code>regression.yml</code>)</td><td>Semanal; consume cuota Gemini real.</td></tr></tbody></table>
+<hr/>
+<h3>1.5 Plan de Liberación</h3>
+<h4>Estrategia de versionado</h4>
+<ul><li><strong>SemVer</strong> (<code>MAJOR.MINOR.PATCH</code>).</li><li>Pre-releases del socio formador se etiquetan <code>vX.Y.Z-sprintN</code> (ej. <code>v0.5.0-sprint4</code>).</li><li>Cambios breaking se anuncian con antelación de 1 sprint en CHANGELOG.</li></ul>
+<h4>Frecuencia de releases</h4>
+<ul><li><strong>Por sprint</strong> (cada 2 semanas) coincidiendo con la demo al socio formador.</li><li><strong>Hotfixes</strong> según necesidad (incidentes críticos en producción).</li></ul>
+<h4>Proceso de liberación paso a paso</h4>
+<ol><li><strong>Congelar funcionalidad</strong> 2 días antes del fin de sprint (sólo bugfixes después).</li><li><strong>Verificar CI verde</strong> en <code>main</code>.</li><li><strong>Ejecutar suite completa</strong>: <code>npm test</code> (backend), build de frontend, smoke test manual de flujos críticos (login, chatbot, dashboard).</li><li><strong>Ejecutar regresión LLM</strong>: <code>cd backend &amp;amp;&amp;amp; npm run regression</code> — exigir ≥ 95 % de pass rate.</li><li><strong>Actualizar <code>CHANGELOG.md</code></strong> con cambios desde el último tag.</li><li><strong>Crear tag</strong>: <code>git tag -a vX.Y.Z -m "Sprint N"</code> y <code>git push --tags</code>.</li><li><strong>Vercel despliega automáticamente</strong> desde <code>main</code>. Verificar URL de producción.</li><li><strong>Smoke test post-deploy</strong> en URL de producción (login → chatbot → dashboard).</li><li><strong>Anuncio al socio formador</strong> con liga, notas de versión y demo agendada.</li></ol>
+<h4>Criterios de calidad (puerta de release)</h4>
+<table><thead><tr><th>Criterio</th><th>Umbral</th></tr></thead><tbody><tr><td>Pruebas Jest</td><td>100 % verdes (181/181 actualmente)</td></tr><tr><td>Cobertura mínima módulos críticos</td><td>70 % en <code>routes/chatbot.js</code>, <code>utils/agent/<em></code>, <code>utils/tools/</em></code></td></tr><tr><td>Regresión LLM (Gemini real)</td><td>≥ 95 % pass rate</td></tr><tr><td>Tasa de alucinación en grounded queries</td><td>0 %</td></tr><tr><td>Build de frontend</td><td>Sin errores ni warnings críticos</td></tr><tr><td><code>npm audit</code> (high/critical)</td><td>0 vulnerabilidades sin parche disponible</td></tr><tr><td>Smoke test manual</td><td>Login, dashboard, chatbot (consulta + acción), demo Sofía</td></tr></tbody></table>
+<hr/>
+<h3>1.6 Control de Interfaces</h3>
+<h4>Interfaces internas (frontend ↔ backend)</h4>
+<table><thead><tr><th>Endpoint</th><th>Verbo</th><th>Propósito</th><th>Versionado</th></tr></thead><tbody><tr><td><code>/api/auth/login</code></td><td>POST</td><td>Autenticación</td><td>v1</td></tr><tr><td><code>/api/movimientos</code></td><td>GET/POST</td><td>CRUD movimientos financieros</td><td>v1</td></tr><tr><td><code>/api/metas</code></td><td>GET/POST/PATCH</td><td>Metas de ahorro</td><td>v1</td></tr><tr><td><code>/api/presupuestos</code></td><td>GET/POST</td><td>Presupuestos por categoría</td><td>v1</td></tr><tr><td><code>/api/recurrencias</code></td><td>GET/POST/PATCH</td><td>Suscripciones / cargos recurrentes</td><td>v1</td></tr><tr><td><code>/api/insights</code></td><td>GET</td><td>Insights deterministas</td><td>v1</td></tr><tr><td><code>/api/proactive-insights</code></td><td>GET</td><td>Insights generados por LLM (cache 6h)</td><td>v1</td></tr><tr><td><code>/api/chatbot</code></td><td>POST (SSE)</td><td>Stream agentic del chatbot</td><td>v1</td></tr><tr><td><code>/api/chatbot/confirm-action</code></td><td>POST</td><td>Confirmación de acción de escritura propuesta</td><td>v1</td></tr><tr><td><code>/api/chatbot/cancel-action</code></td><td>POST</td><td>Cancelación de propuesta</td><td>v1</td></tr></tbody></table>
+<p><strong>Documentación:</strong> Cada endpoint documentado en su archivo <code>routes/*.js</code> con comentario de cabecera (request/response shape). El contrato del SSE del chatbot se documenta en <code>docs/CHATBOT_SSE.md</code> (planeado).</p>
+<h4>Interfaces externas (APIs de terceros)</h4>
+<table><thead><tr><th>Servicio</th><th>Uso</th><th>Documentación</th></tr></thead><tbody><tr><td><strong>Supabase</strong></td><td>BD + Auth</td><td>https://supabase.com/docs</td></tr><tr><td><strong>Google Gemini API</strong></td><td>LLM principal</td><td>https://ai.google.dev/docs</td></tr><tr><td><strong>Ollama</strong></td><td>LLM local fallback</td><td>https://ollama.com/library</td></tr><tr><td><strong>Vercel</strong></td><td>Hosting + Functions</td><td>https://vercel.com/docs</td></tr></tbody></table>
+<h4>Proceso ante cambios de interfaz</h4>
+<ol><li><strong>Cambio breaking</strong>: nuevo endpoint con sufijo <code>/v2/</code> y deprecación documentada del v1 con plazo de 1 sprint.</li><li><strong>Cambio aditivo retrocompatible</strong>: documentado en CHANGELOG, sin nueva versión de endpoint.</li><li><strong>Cambio en proveedor externo</strong>: se evalúa impacto, se ajusta adaptador (<code>utils/providers/*</code>, <code>aiProvider.js</code>) y se cubre con prueba.</li></ol>
+<h4>Riesgos asociados</h4>
+<table><thead><tr><th>Riesgo</th><th>Mitigación</th></tr></thead><tbody><tr><td>Gemini cambia formato de respuesta de tool calls</td><td><code>zodToGeminiSchema</code> + validación zod estricta; pruebas de regresión semanales.</td></tr><tr><td>Supabase cambia política de RLS</td><td>Pruebas de integración con seed Sofía; backups antes de cada migración.</td></tr><tr><td>Vercel cambia runtime por defecto</td><td>Pin explícito en <code>vercel.json</code>.</td></tr><tr><td>Ollama no disponible en demo offline</td><td>Bandera de capacidad y mensaje "modo limitado" en UI.</td></tr></tbody></table>
+<hr/>
+<h3>1.7 Gestión de Proveedores</h3>
+<h4>Dependencias externas principales</h4>
+<p><strong>Backend (<code>backend/package.json</code>):</strong></p>
+<ul><li><code>@supabase/supabase-js</code> ^2.103</li><li><code>express</code> ^5.2</li><li><code>@google/generative-ai</code> (Gemini SDK)</li><li><code>zod</code> ^4.x (validación de tools y respuestas estructuradas)</li><li><code>cors</code>, <code>dotenv</code>, <code>express-rate-limit</code></li><li><code>jest</code> (dev)</li></ul>
+<p><strong>Frontend (<code>frontend/package.json</code>):</strong></p>
+<ul><li><code>react</code> ^19, <code>react-dom</code> ^19</li><li><code>vite</code> (build)</li><li><code>recharts</code> (gráficos del chatbot)</li><li><code>@supabase/supabase-js</code></li></ul>
+<p><strong>Servicios:</strong></p>
+<ul><li>Supabase (Postgres, Auth)</li><li>Google Gemini (LLM)</li><li>Vercel (hosting)</li><li>GitHub (repo + CI)</li></ul>
+<h4>Control de versiones externas</h4>
+<ul><li><code>package-lock.json</code> se versiona obligatoriamente — garantiza instalación reproducible.</li><li>Versiones se fijan con rango caret (<code>^</code>) por defecto; se fija exacta cuando hay incompatibilidades conocidas (ej. <code>zod@4.x</code> por uso de <code>z.toJSONSchema()</code>).</li><li>Dependencias mayores se actualizan sólo dentro de un PR de tipo <code>chore/upgrade-&amp;lt;dep&amp;gt;</code> con pruebas verdes.</li></ul>
+<h4>Políticas de actualización</h4>
+<table><thead><tr><th>Tipo de cambio</th><th>Política</th></tr></thead><tbody><tr><td>Patch (X.Y.Z → X.Y.Z+1)</td><td>Aceptable en cualquier PR si CI sigue verde.</td></tr><tr><td>Minor (X.Y.0 → X.Y+1.0)</td><td>PR dedicado; revisar changelog del proveedor.</td></tr><tr><td>Major (X.0.0 → X+1.0.0)</td><td>PR dedicado + spike de validación; aprobación del líder técnico.</td></tr><tr><td>Vulnerabilidad crítica</td><td>Hotfix prioritario en ≤ 48 h.</td></tr></tbody></table>
+<h4>Riesgos</h4>
+<table><thead><tr><th>Riesgo</th><th>Probabilidad</th><th>Mitigación</th></tr></thead><tbody><tr><td>Cuota agotada en Gemini</td><td>Media</td><td>Suite de regresión gateada, fallback a Ollama, monitoreo de uso.</td></tr><tr><td>Cambio breaking en Express 5 (recién estable)</td><td>Media</td><td>Pruebas de integración cubren rutas críticas; pin de versión.</td></tr><tr><td>Licencia incompatible en nueva dependencia</td><td>Baja</td><td>Revisión manual de licencia (preferimos MIT/Apache 2.0/BSD).</td></tr><tr><td>Caída de Vercel</td><td>Baja</td><td>Documentación de despliegue alterno; status page monitoreada.</td></tr><tr><td>Caída de Supabase</td><td>Baja</td><td>Backups diarios; plan documentado de recuperación.</td></tr><tr><td>Deprecación de modelo Gemini 2.5 Flash</td><td>Media</td><td>Capa de proveedor abstrae el modelo; cambio aislado a un archivo.</td></tr></tbody></table>
+<hr/>
+<h2>2. Documentación de Diseño (M2)</h2>
+<p><em>Responsable: Frumen</em></p>
+<p>Avance de diseño correspondiente a los sprints completados. Incluye:</p>
+<ul><li>Wireframes de pantallas principales (Login, Dashboard, Chatbot, Metas, Presupuestos).</li><li>Guía visual: paleta de colores (rojos / verdes / naranjas / grises / blancos), tipografía, espaciado.</li><li>Diagrama de componentes del frontend.</li><li>Flujos de usuario (golden path: login → consulta chatbot → confirmar acción).</li></ul>
+<blockquote><em>Nota: Este avance no se califica en la entrega parcial; se recibe retroalimentación del profesor.</em></blockquote>
+<hr/>
+<h2>3. Producto Funcional y Código (M3)</h2>
+<p><em>Responsables: Jorge (Web), Elvia (Reto), Luis (BD), Elvia (IA)</em></p>
+<h3>3.1 Repositorio</h3>
+<ul><li>URL: GitHub — <code>FinanceSmart</code></li><li>Rama productiva: <code>main</code></li><li>Última versión etiquetada: pendiente de tag inicial post-rebuild.</li></ul>
+<h3>3.2 Sistema funcional al momento</h3>
+<ul><li>✅ <strong>Frontend</strong> (React 19 + Vite) en producción en Vercel.</li><li>✅ <strong>Backend</strong> (Express 5 sobre Vercel Functions) en producción.</li><li>✅ <strong>Conectividad frontend ↔ backend</strong> vía REST + SSE para el chatbot.</li><li>✅ <strong>Conectividad backend ↔ Supabase</strong> con auth y RLS.</li></ul>
+<h3>3.3 Implementación de Base de Datos</h3>
+<p><em>Responsable: Luis</em></p>
+<p><strong>Tablas principales:</strong></p>
+<ul><li><code>usuarios</code> (gestionada por Supabase Auth + tabla extendida <code>usuario_perfil</code>)</li><li><code>categorias</code></li><li><code>movimientos</code></li><li><code>metas_ahorro</code></li><li><code>presupuestos</code></li><li><code>recurrencias</code></li><li><code>tarjetas</code></li><li><code>proactive_insights_cache</code> (cache de insights LLM, TTL 6h)</li></ul>
+<p><strong>Normalización (3FN):</strong></p>
+<ul><li>1FN: todos los campos atómicos (sin listas, sin JSON salvo en <code>parametros_json</code> justificado).</li><li>2FN: PKs simples (<code>id_*</code>); ningún atributo depende de subconjunto de PK compuesta (no hay PKs compuestas en tablas transaccionales).</li><li>3FN: ningún atributo no clave depende transitivamente de la PK. Ejemplo: en <code>movimientos</code>, <code>id_categoria</code> referencia <code>categorias(id_categoria)</code>; el nombre de categoría NO se duplica en <code>movimientos</code>.</li></ul>
+<p><strong>Excepciones documentadas:</strong></p>
+<ul><li><code>proactive_insights_cache.observaciones_json</code> (JSONB) — desnormalizado intencionalmente porque es payload de salida del LLM consumido tal cual por el frontend; nunca se consulta por campos internos.</li></ul>
+<h3>3.4 Integración IA</h3>
+<p><em>Responsable: Elvia</em></p>
+<ul><li>Capa de proveedor (<code>backend/utils/aiProvider.js</code>) con dos implementaciones: <strong>Gemini 2.5 Flash</strong> (producción) y <strong>Ollama qwen2.5:7b</strong> (offline/dev).</li><li>Selección por capacidad (<code>capabilities.supportsTools</code>): si el proveedor soporta tools → loop agentic; si no → context-injection.</li><li><strong>11 herramientas</strong> registradas (<code>backend/utils/tools/</code>):</li></ul>
+<p>  - Lectura: resumen mes, movimientos, gastos por categoría, metas, presupuestos, recurrencias, tarjetas, salud financiera, insights.   - Escritura (sólo emiten propuestas): aporte a meta, crear/modificar presupuesto, toggle recurrencia, crear meta.</p>
+<ul><li>Validación zod estricta por herramienta con enums por usuario (categorías, tarjetas, metas) — <strong>previene alucinación de IDs</strong>.</li><li>11 widgets visuales emitidos por el chatbot: chart, simulator, streak, compare, gauge, heatmap, subs, top merchants, savings rate, recurring calendar, sparklines.</li><li><strong>Suite de regresión</strong> (<code>backend/regression/</code>) con 64 prompts contra Gemini real → 96.9 % pass rate, 0 % alucinación en consultas grounded.</li></ul>
+<hr/>
+<h2>4. Calidad (M4)</h2>
+<p><em>Responsable: Iliana</em></p>
+<ul><li><strong>181 pruebas Jest</strong> en backend, todas verdes.</li><li>Cobertura de módulos críticos:</li></ul>
+<p>  - <code>routes/chatbot.js</code>   - <code>utils/agent/loop.js</code>   - <code>utils/agent/proposalStore.js</code>   - <code>utils/tools/<em></code>   - <code>utils/providers/</em></code></p>
+<ul><li>Suite de regresión con 11 tipos de assertion: <code>contains_number</code>, <code>cites_category</code>, <code>no_fabricated_categories</code>, <code>no_dates_outside_data</code>, <code>no_fabricated_amounts</code>, <code>invokes_tool</code>, <code>does_not_invoke_tool</code>, <code>refuses_gracefully</code>, <code>mentions_meta</code>, <code>language</code>, <code>max_length</code>.</li><li>Reportes generados: <code>regression/report-*.json</code>, <code>regression/summary.csv</code> (commiteado para diff en PR).</li></ul>
+<blockquote>Detalle adicional en el Módulo de Calidad (entrega individual y de equipo).</blockquote>
+<hr/>
+<h2>5. Deployment (M5)</h2>
+<p><em>Responsables: Jorge (Web), Elvia (Reto)</em></p>
+<h3>CI/CD activo</h3>
+<ul><li><strong><code>.github/workflows/ci.yml</code></strong> — corre en cada PR y push a <code>main</code>:</li></ul>
+<p>  - Instalación con <code>npm ci</code>.   - Lint del frontend.   - Pruebas Jest del backend.   - Build del frontend.</p>
+<ul><li><strong><code>.github/workflows/regression.yml</code></strong> — programado semanal + manual:</li></ul>
+<p>  - Ejecuta suite de regresión LLM contra Gemini real.   - Publica reporte como artifact.</p>
+<ul><li><strong>Vercel</strong> — despliegue automático:</li></ul>
+<p>  - Cada PR genera <strong>preview URL</strong> para validación.   - Cada merge a <code>main</code> despliega a <strong>producción</strong>.   - Variables de entorno gestionadas en Vercel Dashboard (no en repo).</p>
+<h3>Rollback</h3>
+<ul><li>En caso de incidente: <code>vercel rollback</code> al deployment anterior conocido bueno (≤ 30 segundos).</li></ul>
+<hr/>
+<h2>6. Seguimiento del Reto (M6)</h2>
+<p><em>Responsable: Elvia</em></p>
+<ul><li><strong>Sesiones de Reto</strong> documentadas en actas internas del equipo.</li><li><strong>Demos al socio formador</strong> agendadas al cierre de cada sprint con la versión etiquetada de <code>main</code>.</li><li>Retroalimentación del socio se traduce en issues nuevos, priorizados en planning del siguiente sprint.</li></ul>
+<hr/>
+<h2>Anexos</h2>
+<h3>A. Plantilla de Pull Request</h3>
+<pre><code class="lang-markdown">## Resumen
+&lt;qué cambia y por qué&gt;
+
+## Tickets / Issues
+Closes #&lt;id&gt;
+
+## Cambios principales
+- ...
+
+## Cómo probar
+1. ...
+2. ...
+
+## Checklist
+- [ ] CI en verde
+- [ ] Pruebas añadidas/actualizadas
+- [ ] Documentación actualizada (si aplica)
+- [ ] Sin secretos commiteados</code></pre>
+<h3>B. Plantilla de Issue de Bug</h3>
+<pre><code class="lang-markdown">**Descripción:** ...
+**Pasos para reproducir:** 1. ... 2. ... 3. ...
+**Esperado:** ...
+**Observado:** ...
+**Versión / commit:** vX.Y.Z (sha ...)
+**Severidad:** crítica / alta / media / baja</code></pre>
+<h3>C. Convención de mensajes de commit</h3>
+<pre><code>Tipo: descripción breve en imperativo
+
+Cuerpo opcional explicando qué/por qué.
+
+Co-Authored-By: &lt;colaborador&gt; &lt;correo&gt;</code></pre>
+<p>Tipos aceptados: <code>Add</code>, <code>Fix</code>, <code>Update</code>, <code>Refactor</code>, <code>UI</code>, <code>Docs</code>, <code>Chore</code>, <code>Test</code>.</p>
+<hr/>
+<p><strong>Fin del documento.</strong></p>
+</body>
+</html>

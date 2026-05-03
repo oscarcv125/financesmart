@@ -5,6 +5,7 @@ import {
   PieChart, Pie,
 } from "recharts";
 import { BACKEND_URL } from "../config";
+import ProactiveInsightsPanel from "./ProactiveInsightsPanel";
 const TABS = ["Mensual", "Trimestral", "Anual"];
 
 const CustomBarLabel = ({ x, y, width, value }) => (
@@ -19,15 +20,24 @@ export default function FinancialDashboard() {
   const [pieOpen, setPieOpen] = useState(true);
   const [barData, setBarData] = useState([]);
   const [pieData, setPieData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
+    const ctrl = new AbortController();
+    setLoading(true);
+    setLoadError(null);
     axios
-      .get(`${BACKEND_URL}/api/finanzas/${activeTab.toLowerCase()}`)
+      .get(`${BACKEND_URL}/api/finanzas/${activeTab.toLowerCase()}`, { signal: ctrl.signal })
       .then((res) => {
         setBarData(res.data.barras);
         setPieData(res.data.pay);
+        setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        // Ignore aborts triggered by tab changes / unmount.
+        if (axios.isCancel?.(err) || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return;
+        setLoadError('No pudimos cargar tus finanzas. Mostrando datos de ejemplo.');
         setBarData([
           { name: "Ene", value: 3200, color: "#e53935" },
           { name: "Feb", value: 5800, color: "#43a047" },
@@ -38,7 +48,9 @@ export default function FinancialDashboard() {
           { name: "Snacks", value: 25, color: "#e53935" },
           { name: "Ocio", value: 40, color: "#fdd835" },
         ]);
+        setLoading(false);
       });
+    return () => ctrl.abort();
   }, [activeTab]);
 
   return (
@@ -221,6 +233,76 @@ export default function FinancialDashboard() {
           line-height: 1.5;
         }
 
+        /* ── Proactive insights panel ── */
+        .proactive-insights-panel {
+          margin-bottom: 18px;
+        }
+        .proactive-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+        }
+        .proactive-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #333;
+        }
+        .proactive-refresh-btn {
+          background: transparent;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #666;
+        }
+        .proactive-refresh-btn:hover { background: #f0f0f0; }
+        .proactive-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .spinning { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .proactive-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 12px;
+        }
+        .proactive-card {
+          position: relative;
+          background: #fff;
+          border-radius: 12px;
+          border-left: 4px solid #999;
+          padding: 12px 14px 12px 14px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .proactive-card-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 6px;
+          display: flex;
+          align-items: center;
+        }
+        .proactive-card-detail {
+          font-size: 12px;
+          color: #666;
+          line-height: 1.4;
+        }
+        .proactive-dismiss {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: transparent;
+          border: none;
+          color: #aaa;
+          cursor: pointer;
+          padding: 2px;
+          line-height: 1;
+        }
+        .proactive-dismiss:hover { color: #555; }
+
         /* ── FAB ── */
         .fab {
           position: fixed;
@@ -264,6 +346,35 @@ export default function FinancialDashboard() {
 
           {/* Page body */}
           <main className="page-body">
+
+            <ProactiveInsightsPanel />
+
+            {loadError && (
+              <div role="alert" style={{
+                margin: '12px 0',
+                padding: '10px 14px',
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: 6,
+                color: '#664d03',
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 13,
+              }}>
+                {loadError}
+              </div>
+            )}
+
+            {loading && barData.length === 0 && (
+              <div aria-live="polite" style={{
+                margin: '12px 0',
+                padding: '10px 14px',
+                color: '#6c757d',
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 13,
+              }}>
+                Cargando tus finanzas…
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="tabs">

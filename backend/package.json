@@ -4,7 +4,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "jest"
+    "test": "jest",
+    "regression": "node regression/runner.js",
+    "regression:gemini": "node regression/runner.js --provider gemini",
+    "prompt-sheet": "node regression/generatePromptSheet.js"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +19,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
-    "ollama": "^0.6.3"
+    "ollama": "^0.6.3",
+    "zod": "^4.4.2"
   },
   "devDependencies": {
     "jest": "^30.3.0",

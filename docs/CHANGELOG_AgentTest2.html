@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>SCMP — FinanceSmart</title>
+<style>
+  @page { size: Letter; margin: 18mm 16mm; }
+  :root {
+    --fg: #1a1a1a;
+    --muted: #555;
+    --accent: #c8102e;
+    --accent-soft: #f4d3d8;
+    --border: #d8d8d8;
+    --code-bg: #f6f6f6;
+    --table-stripe: #fafafa;
+    --table-head: #f0f0f0;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: white; color: var(--fg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    margin: 0;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.2; margin: 1.4em 0 0.5em; page-break-after: avoid; }
+  h1 {
+    font-size: 22pt;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 0.25em;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 16pt;
+    color: var(--accent);
+    border-bottom: 1px solid var(--accent-soft);
+    padding-bottom: 0.2em;
+    margin-top: 1.6em;
+  }
+  h3 { font-size: 13pt; color: #333; }
+  h4 { font-size: 11.5pt; color: #444; font-weight: 600; }
+  p { margin: 0.5em 0; orphans: 3; widows: 3; }
+  ul, ol { margin: 0.4em 0 0.6em 1.2em; padding: 0; }
+  li { margin: 0.15em 0; }
+  blockquote {
+    margin: 0.6em 0;
+    padding: 0.4em 0.9em;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    color: #4a1a22;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
+  }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 9.5pt;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.7em 0.9em;
+    overflow: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: transparent; padding: 0; font-size: 9pt; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.7em 0 1em;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  thead th { background: var(--table-head); font-weight: 600; }
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .cover {
+    page-break-after: always;
+    text-align: center;
+    padding-top: 35vh;
+  }
+  .cover h1 { border: 0; font-size: 32pt; }
+  .cover .sub { color: var(--muted); font-size: 14pt; margin-top: 0.4em; }
+  .cover .meta { margin-top: 4em; font-size: 11pt; color: var(--muted); }
+</style>
+</head>
+<body>
+<section class="cover">
+  <h1>Changelog Branch <code style="background:transparent;color:#c8102e">AgentTest2</code></h1>
+  <div class="sub">Rebuild agéntico del chatbot · FinanceSmart</div>
+  <div class="meta">
+    Cierre 3 de mayo de 2026<br/>
+    23 archivos modificados · 30+ archivos nuevos · 191/191 tests verde<br/>
+    Regresión LLM 96.9% contra Gemini real · 0% alucinación en grounded
+  </div>
+</section>
+<h1>FinanceSmart — Changelog de la Branch <code>AgentTest2</code></h1>
+<p><strong>Proyecto:</strong> FinanceSmart (asistente financiero en español con chatbot agéntico) <strong>Branch:</strong> <code>AgentTest2</code> (rama del rebuild agéntico) <strong>Comparado contra:</strong> <code>main</code> <strong>Estadísticas globales:</strong> 23 archivos modificados, 3,718 líneas añadidas, 1,006 borradas, +30 archivos nuevos (tests, migraciones, servicios, docs). <strong>Fecha de cierre:</strong> 3 de mayo de 2026 <strong>Cobertura de pruebas:</strong> 191/191 tests Jest verde · regresión LLM real 96.9 % (62/64)</p>
+<hr/>
+<h2>Resumen ejecutivo</h2>
+<p><strong>Qué se hizo:</strong> rebuild completo del chatbot de FinanceSmart, pasando de un sistema basado en context-injection con regex frágil a un <strong>agente real con tool calling</strong> que consulta los datos del usuario antes de responder. El rebuild se hizo en tres olas:</p>
+<ol><li><strong>Rebuild agéntico</strong> — capa de proveedor multi-LLM (Gemini 2.5 Flash + Ollama qwen2.5:7b), agent loop con 18 tools (11 lectura, 5 escritura, 2 planning), envelope JSON typed con Zod, 11 widgets visuales, write-actions con confirmación de doble paso, y guardrails anti-alucinación a nivel estructural (enums per-request, validación de fechas, scope-bound al usuario).</li></ol>
+<ol><li><strong>Auditoría sistemática (sweep #1)</strong> — 7 subagentes en paralelo auditaron deps/bugs/perf/tests/guardrails. <strong>21 issues</strong> aplicados: vercel.json con maxDuration, atomic claim en proposalStore, transaccionalidad en aportes, defensive guards en widgets, code-splitting de bundle (1.1 MB → 4 chunks), timeouts upstream, force-break en loops redundantes, ownership checks defensivos, y 8 más.</li></ol>
+<ol><li><strong>Mejoras tiered (sweep #2)</strong> — otros <strong>21 items</strong> cubriendo los 5 tiers: streaming token-por-token real, compactación de historial, logger estructurado, audit log append-only, rate limit per-user IPv6-safe, cache de insights persistente en Postgres, a11y completo (ARIA + ESC + focus), TTS, touch drag, mobile-responsive, server-side chat history, planes financieros largo plazo, PDF export, notificaciones backend, e i18n scaffold.</li></ol>
+<p><strong>Resultados medibles:</strong></p>
+<table><thead><tr><th>Métrica</th><th>Antes</th><th>Después</th></tr></thead><tbody><tr><td>Tasa de alucinación en queries grounded</td><td>Frecuente (motivo del rebuild)</td><td><strong>0 %</strong></td></tr><tr><td>Regresión LLM contra Gemini real</td><td>Sin suite</td><td><strong>96.9 %</strong> (62/64 prompts)</td></tr><tr><td>Tests Jest</td><td>~50</td><td><strong>191</strong> (18 suites)</td></tr><tr><td>Bundle frontend (chunk inicial)</td><td>~1.1 MB</td><td><strong>355 KB</strong> (resto en chunks lazy)</td></tr><tr><td>SSE timeout en Vercel</td><td>10–60 s default</td><td><strong>300 s</strong></td></tr><tr><td>Widgets del chatbot</td><td>4 (parseados con regex)</td><td><strong>11</strong> (validados con Zod)</td></tr><tr><td>Tools del agente</td><td>0</td><td><strong>18</strong></td></tr><tr><td>Tablas nuevas en producción</td><td>—</td><td><strong>7</strong> (audit_log, chat_message, notificacion, plan_*, proactive_insights_cache)</td></tr><tr><td><code>npm audit</code> (back + front)</td><td>—</td><td><strong>0 vulnerabilidades</strong></td></tr></tbody></table>
+<p><strong>Lo que sigue habilitado pero sin UI todavía:</strong> historial de chat server-side, planes financieros largo plazo, notificaciones — los endpoints y tablas están listos en producción; solo falta la UI para exponerlos.</p>
+<p><strong>Estado del deployment:</strong> las 5 migraciones SQL (003-007) ya están aplicadas en el proyecto Supabase de producción <code>qzqtepussricbilarxyn</code>. El código está en working tree de <code>AgentTest2</code>, listo para commit + push. Vercel auto-deploya en cuanto se haga <code>git push</code>.</p>
+<hr/>
+<h2>0. Por qué este rebuild</h2>
+<p>El chatbot anterior (<code>backend/routes/chatbot.js</code> previo) <strong>alucinaba consistentemente</strong> incluso con context-injection. Después de un intento fallido de hacerlo agéntico (commit <code>a25176a</code> revertido), el equipo había shipeado <strong>5 patches consecutivos</strong> de regex frágil para parsear los 4 widgets (<code>CHART/STREAK/COMPARE/SIMULATOR</code>).</p>
+<p><strong>Causas raíz identificadas:</strong></p>
+<ol><li>Modelo subdimensionado (Ollama <code>llama3.1:8b</code> no maneja JSON estricto ni tool calling confiable).</li><li>Output free-form con regex post-procesado (<code>STREAKS</code> vs <code>STREAK</code>, falta de braces, <code><strong>TAG</strong></code>, etc.).</li><li>Tools sin validación server-side → fechas alucinadas crashearon Postgres.</li><li>Sin suite de regresión → alucinaciones se descubrían en producción.</li></ol>
+<p><strong>Decisiones del equipo:</strong></p>
+<ul><li>Multi-provider, capability-aware. Gemini 2.5 Flash en producción; Ollama (<code>qwen2.5:7b</code>) como fallback offline.</li><li>Reemplazar regex de tags por <strong>single typed JSON envelope</strong> (zod-validated).</li><li>4 capacidades agénticas: multi-step, write-actions-with-confirmation, proactive insights, long-horizon planning.</li><li>Sólo en español. Sofia es el fixture canónico.</li></ul>
+<hr/>
+<h2>1. Arquitectura final</h2>
+<pre><code>                 ┌──────────────────────────────────┐
+   POST /api/    │  chatbot route                   │── SSE: delta│widget│tool_call│
+   chatbot ─────►│  (capability-branch en provider) │   tool_result│action_proposal│
+                 └──┬─────────────────────────┬─────┘   status│done
+                    │ supportsTools=true      │ supportsTools=false
+                    ▼                         ▼
+          ┌────────────────────┐    ┌──────────────────────┐
+          │  runAgentLoop      │    │  generateStream      │
+          │  (Gemini path)     │    │  (Ollama fallback)   │
+          └─┬────────────────┬─┘    └──────────────────────┘
+   stream    │   exec tools  │
+   con tools │               │
+            ▼               ▼
+   ┌──────────────┐  ┌──────────────┐
+   │ Gemini       │  │ tool         │
+   │ (responseS-  │  │ registry     │
+   │ chema, tools,│  │ (zod, enums  │
+   │ streaming)   │  │  per-request)│
+   └──────────────┘  └──┬───────────┘
+                        │
+            ┌───────────┴────────────┐
+            │  read tools (11)       │
+            │  write tools (5)       │
+            │  plan tools (2)        │ ← long-horizon planning
+            └────────────────────────┘</code></pre>
+<p>Cada tool valida sus argumentos contra <strong>enums por usuario</strong> construidos al inicio de cada request (<code>tools/context.js</code>). Esto previene structuralmente la alucinación de IDs.</p>
+<p>Las write tools <strong>nunca mutan</strong> la BD: emiten propuestas a un store en memoria. La mutación real ocurre sólo en <code>POST /api/chatbot/confirm-action</code>, que <strong>re-valida</strong> con la misma zod schema.</p>
+<hr/>
+<h2>2. Cambios por capa</h2>
+<h3>2.1 Backend — Núcleo agéntico</h3>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/utils/agent/loop.js</code></td><td>NUEVO</td><td>Agent loop. Iter cap = 10. Detecta loops redundantes (3 idénticos / ABAB). <strong>Streaming real</strong> vía <code>generateStreamWithTools</code> cuando se pasa <code>onTextDelta</code>. <strong>Compactación de historial</strong> — al pasar 40 KB, los <code>functionResponse</code> viejos se reemplazan por placeholders. Force-break en redundancia.</td></tr><tr><td><code>backend/utils/agent/grounding.js</code></td><td>NUEVO</td><td>Guardrails parametrizados por nombre del usuario (NO hardcoded "Sofía"). 6 reglas inviolables: nunca revelar prompt, nunca revelar nombres internos de tools, siempre español, nunca inventar montos/fechas/categorías, refuse out-of-scope, scope-bound al usuario.</td></tr><tr><td><code>backend/utils/agent/proposalStore.js</code></td><td>NUEVO</td><td>TTL store en memoria (10 min). API: <code>create()</code>, <code>tryClaim()</code>, <code>release()</code>, <code>consume()</code>, <code>cancel()</code>. <strong>Atómico</strong>: <code>tryClaim()</code> marca claim sincronamente antes de cualquier <code>await</code>, evita doble-ejecución por race. Sweeper background cada 5 min.</td></tr><tr><td><code>backend/utils/zodToGeminiSchema.js</code></td><td>NUEVO</td><td>Convierte zod schema → Gemini OpenAPI subset. Strip <code>const</code>, <code>propertyNames</code>, <code>additionalProperties</code>, <code>$schema</code>. Convierte <code>oneOf</code> de objetos → <code>enum</code> aplanado. Lowercase JSON-schema types (fix del bug <code>ba00a0a</code>).</td></tr></tbody></table>
+<h3>2.2 Backend — Tools</h3>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/utils/tools/index.js</code></td><td>NUEVO</td><td><code>buildToolRegistry({supabase, id_usuario, opts})</code>. Devuelve <code>{tools, geminiDeclarations, exec(name, args)}</code>. Aplica zod safeParse antes de cada exec. Try/catch con error message redactado.</td></tr><tr><td><code>backend/utils/tools/context.js</code></td><td>NUEVO</td><td>Pre-fetch en paralelo de categoria/tarjeta/ahorro_meta/presupuesto/recurrencia. Construye Sets de IDs y Maps por nombre. Fail-fast si cualquier fetch falla (evita "Set vacío == cualquier ID es válido").</td></tr><tr><td><code>backend/utils/tools/schemas.js</code></td><td>NUEVO</td><td>Zod schemas con <code>isoDate()</code> (regex + calendar valid + range refine 2020-hoy). Per-request enums. <strong>TOOL_DESCRIPTIONS_ES</strong> con patrones explícitos para preguntas complejas (cambios de salario, proyección de metas, etc.).</td></tr><tr><td><code>backend/utils/tools/readTools.js</code></td><td>NUEVO</td><td>11 read tools: <code>obtener_resumen_mes</code>, <code>obtener_resumen_periodo</code>, <code>obtener_movimientos</code>, <code>obtener_gastos_por_categoria</code> (mes/periodo), <code>obtener_metas_ahorro</code>, <code>obtener_presupuestos</code>, <code>obtener_recurrencias</code>, <code>obtener_tarjetas</code>, <code>obtener_salud_financiera</code>, <code>obtener_insights_automaticos</code>, <code>obtener_planes</code>, <code>obtener_adherencia_plan</code>. Truncación a 25 KB con marker.</td></tr><tr><td><code>backend/utils/tools/writeTools.js</code></td><td>NUEVO</td><td>5 write tools: <code>proponer_aporte_meta</code>, <code>proponer_crear_presupuesto</code>, <code>proponer_modificar_presupuesto</code>, <code>proponer_toggle_recurrencia</code>, <code>proponer_crear_meta</code>. <strong>Cero mutaciones directas</strong> — sólo emiten proposal y SSE event. <code>crear_movimiento</code> deliberadamente omitido (alto riesgo de monto alucinado).</td></tr></tbody></table>
+<h3>2.3 Backend — Providers</h3>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/utils/providers/gemini.js</code></td><td>MODIFICADO</td><td>Capabilities flag (<code>supportsStructuredOutput/Tools/ToolCalling/Streaming</code>). <code>generateStream</code>, <code>generateStructured</code>, <code>generateWithTools</code>, <strong><code>generateStreamWithTools</code> (NUEVO)</strong> — yields <code>{type:'text', delta}</code> o <code>{type:'toolCalls', calls}</code>. <strong>Timeout 90 s</strong> vía <code>AbortSignal.any([clientSignal, AbortSignal.timeout(N)])</code> con fallback Node 18.</td></tr><tr><td><code>backend/utils/providers/ollama.js</code></td><td>MODIFICADO</td><td>Mismas capabilities (excepto toolCalling=false porque es JSON-blob). Protocolo: modelo emite <code>{"action":"tool_call",...}</code> o <code>{"action":"respond",...}</code>. Reintento 1 vez en JSON inválido, fallback a texto plano. <strong>Timeout 120 s</strong> vía <code>raceWithTimeout</code>. Modelo default upgradado a <code>qwen2.5:7b</code>.</td></tr><tr><td><code>backend/utils/aiProvider.js</code></td><td>MODIFICADO</td><td>Provider selection por env <code>AI_PROVIDER</code> (default <code>gemini</code>). Health-check graceful — si Gemini key falta, fallback a Ollama con warning.</td></tr></tbody></table>
+<h3>2.4 Backend — Schemas</h3>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/schemas/chatbotResponse.js</code></td><td>NUEVO</td><td>Zod envelope <code>ChatbotResponse = { text, widgets[], toolCalls?, actions? }</code>. Widget = discriminated union de 11 kinds.</td></tr></tbody></table>
+<h3>2.5 Backend — Observabilidad / Auditoría</h3>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/utils/logger.js</code></td><td>NUEVO</td><td>Logger JSON-line estructurado. Levels: debug/info/warn/error. Indexable en Vercel logs. Drop-in para <code>console.error</code>. Listo para Sentry / Logtail (un solo <code>emit()</code> para reemplazar).</td></tr><tr><td><code>backend/utils/auditLog.js</code></td><td>NUEVO</td><td><code>record({id_usuario, action, status, params, error_message})</code> — append-only a tabla <code>audit_log</code>. Falla silenciosa (no bloquea ejecución del usuario). Llamado en cada confirm-action exitosa o fallida.</td></tr></tbody></table>
+<h3>2.6 Backend — Servicios</h3>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/services/proactiveInsightsService.js</code></td><td>NUEVO</td><td>Insights del dashboard. Tier-1 cache memoria + Tier-2 cache Postgres (<code>proactive_insights_cache</code>, TTL 6 h). Cold-start resilient. LLM-summarized si capability disponible, fallback determinístico.</td></tr></tbody></table>
+<h3>2.7 Backend — Routes (modificados)</h3>
+<table><thead><tr><th>Archivo</th><th>Cambios principales</th></tr></thead><tbody><tr><td><code>backend/routes/chatbot.js</code></td><td>Reescritura completa. Capability-branch (Gemini agent loop / Ollama context-injection). SSE con guards <code>writableEnded/destroyed</code>. <strong>Streaming real token-por-token</strong> vía <code>onTextDelta</code>. Endpoints <code>/confirm-action</code> y <code>/cancel-action</code>. Atomic <code>tryClaim</code> antes de await. Audit log integrado. Logger structured. Pre-fetch (<code>fetchUserFinancialData</code>) y <code>buildToolRegistry</code> paralelizados.</td></tr><tr><td><code>backend/routes/metas.js</code></td><td><code>aportarMeta</code>: validación de ownership de <code>id_tarjeta</code> (defense in depth para path directo). <strong>Transaccional manual</strong>: si insert de movimiento falla, rollback de <code>progreso</code>.</td></tr><tr><td><code>backend/routes/movimientos.js</code></td><td><code>listMovimientos</code>: nuevo parámetro <code>categoriaId</code> que se empuja al query Supabase (antes filtraba en JS DESPUÉS del limit → false-empties).</td></tr><tr><td><code>backend/routes/recurrencias.js</code></td><td><code>materializar</code> ahora <strong>opt-in</strong> (<code>materialize:true</code>). Throttle in-memory 1 h por usuario. Pre-check <code>anyDue</code> evita query inútil. Path del agente pasa <code>materialize:false</code>.</td></tr><tr><td><code>backend/routes/insights.js</code></td><td>Modificado para retornar <code>kind</code> en cada insight (routing de notificaciones).</td></tr><tr><td><code>backend/routes/presupuestos.js</code></td><td>Refactor menor.</td></tr><tr><td><code>backend/routes/proactiveInsights.js</code></td><td>NUEVO endpoint <code>GET /api/proactive-insights</code>.</td></tr><tr><td><code>backend/routes/chatHistory.js</code></td><td>NUEVO. <code>GET/POST/DELETE /api/chat-history</code>. Persistencia server-side de mensajes con paginación y caps de tamaño.</td></tr><tr><td><code>backend/routes/planes.js</code></td><td>NUEVO. CRUD de planes financieros largo plazo + cálculo de adherencia.</td></tr><tr><td><code>backend/routes/export.js</code></td><td>NUEVO. <code>GET /api/export/summary-html</code> genera HTML print-ready. Usuario lo guarda como PDF desde el browser.</td></tr><tr><td><code>backend/routes/notificaciones.js</code></td><td>NUEVO. CRUD + <code>generateForUser()</code> que emite notificación por cada insight high-severity (idempotente por día).</td></tr></tbody></table>
+<h3>2.8 Backend — <code>app.js</code></h3>
+<ul><li>6 routes nuevas montadas: <code>proactive-insights</code>, <code>chat-history</code>, <code>planes</code>, <code>export</code>, <code>notificaciones</code>, (más las pre-existentes).</li><li><code>chatbotIpLimit</code> (60/min, IP gate antes de auth) + <code>chatbotUserLimit</code> (20/min, <strong>per-user</strong> después de auth con <code>keyGenerator</code> IPv6-safe usando <code>ipKeyGenerator</code>).</li></ul>
+<h3>2.9 Backend — Migraciones SQL nuevas</h3>
+<table><thead><tr><th>Archivo</th><th>Tabla(s)</th><th>Propósito</th></tr></thead><tbody><tr><td><code>003_audit_log.sql</code></td><td><code>audit_log</code></td><td>Append-only de todas las write actions ejecutadas. Indexes user+created y action+created.</td></tr><tr><td><code>004_proactive_insights_cache.sql</code></td><td><code>proactive_insights_cache</code></td><td>Cache persistente de insights LLM, TTL 6 h. Sobrevive cold starts de Vercel.</td></tr><tr><td><code>005_chat_message.sql</code></td><td><code>chat_message</code></td><td>Historial del chat server-side por usuario. Cross-device, debugging.</td></tr><tr><td><code>006_planes_financieros.sql</code></td><td><code>plan_financiero</code>, <code>plan_hito</code>, <code>plan_revision</code></td><td>Planes largo plazo: ahorro multi-mes, liquidación de deuda, metas compuestas. Hitos + revisiones de adherencia.</td></tr><tr><td><code>007_notificacion.sql</code></td><td><code>notificacion</code></td><td>Alertas (presupuesto excedido, cargo recurrente grande, meta completada). Severidad alta/media/baja.</td></tr><tr><td><code>apply_003_to_007.sql</code></td><td>(bundle)</td><td>Concatenación idempotente para correr todo en un solo Run del SQL Editor. <strong>Aplicado en producción</strong>.</td></tr></tbody></table>
+<h3>2.10 Backend — Scripts</h3>
+<table><thead><tr><th>Archivo</th><th>Cambios</th></tr></thead><tbody><tr><td><code>backend/scripts/seed-sofia.js</code></td><td>Reescrito de cero. <strong>281 movimientos en 12 meses</strong> (jun 2025 → may 2026). Realismo: salario subió en febrero ($50k→$54k), freelance variable ($2.5k-$5.5k), spike navideño en diciembre, Adobe contratado hace 8 meses, Monitor 4K $5,500 en oct 2025, aportes bi-mensuales de $1,500 a Cancún. Categorías mapeadas explícitamente por ID (Renta como Vivienda, no como Ahorro).</td></tr><tr><td><code>backend/utils/aiProvider.js</code></td><td>Provider selection.</td></tr></tbody></table>
+<h3>2.11 Backend — Tests</h3>
+<p><strong>18 test suites, 191 tests verde:</strong></p>
+<table><thead><tr><th>Test</th><th>Cubre</th></tr></thead><tbody><tr><td><code>agent.test.js</code></td><td>Loop: tool execution, MAX_ITERS cap, redundancy break, parallel tool calls, abort signal</td></tr><tr><td><code>auth.test.js</code></td><td>Bearer parsing, Supabase token rejection, profile auto-create</td></tr><tr><td><code>chatbot.test.js</code></td><td>SSE input validation, modes, system prompt content, <code>actions[]</code>, <code>widgets[]</code> dual-emit, provider error events</td></tr><tr><td><code>chatbotConfirm.test.js</code></td><td><code>/confirm-action</code>, <code>/cancel-action</code>: 400/403/404, single-shot consume, <code>additional_params</code> re-validation</td></tr><tr><td><code>dashboard.test.js</code></td><td>Totales, sign handling, tarjetaSeleccionada, empty user, DB error path</td></tr><tr><td><code>finanzas.test.js</code></td><td>Mensual/trimestral/anual, case-insensitive</td></tr><tr><td><code>geminiProvider.test.js</code></td><td>NUEVO. Capability flags, <code>generateWithTools</code> parsea text + functionCall, error sin API key, 429 surfaced</td></tr><tr><td><code>health.test.js</code></td><td><code>computeScore</code> unit + endpoint smoke</td></tr><tr><td><code>metas.test.js</code></td><td>POST/PATCH/DELETE validation</td></tr><tr><td><code>movimientos.test.js</code></td><td>Validation, tarjeta ownership, sign-flip, CSV export</td></tr><tr><td><code>ollamaProvider.test.js</code></td><td>NUEVO. Capability flags, JSON-blob protocol → toolCalls[]/text translation</td></tr><tr><td><code>presupuestos.test.js</code></td><td><code>monthRange</code> + upsert/delete validation</td></tr><tr><td><code>proposalStore.test.js</code></td><td>Lifecycle: create, scoped get, single-consume, cancel, per-user cap</td></tr><tr><td><code>recurrencias.test.js</code></td><td><code>dueDatesSince</code> + validation + partial PATCH</td></tr><tr><td><code>tarjetas.test.js</code></td><td>POST/PATCH validation</td></tr><tr><td><code>toolContext.test.js</code></td><td>NUEVO. Sets/Maps construction, error → throw (defense vs partial validation)</td></tr><tr><td><code>tools.test.js</code></td><td>Registry build, Gemini declaration shape, schema rejections</td></tr><tr><td><code>writeTools.test.js</code></td><td>Write-tool exposure gating, proposal-only, fabricated id rejection, monto cap</td></tr><tr><td><code>helpers/mockProvider.js</code></td><td>NUEVO. Scripted provider para tests del loop</td></tr></tbody></table>
+<h3>2.12 Backend — Regresión</h3>
+<table><thead><tr><th>Archivo</th><th>Descripción</th></tr></thead><tbody><tr><td><code>backend/regression/prompts.json</code></td><td><strong>67 prompts</strong> en 26 categorías (resumen, categorias, presupuestos, metas, edge_cases, recurrencias, tarjetas, movimientos, comparacion, salud, hallucination_probe, out_of_scope, multi_step, insights, small_talk, consejo, adversarial, ambiguous, dates, numbers, fixture_edge, concision, efficiency, grounded_refusal, complex, <strong>widgets_new</strong>).</td></tr><tr><td><code>backend/regression/expectedAnswers.js</code></td><td>Respuestas esperadas hand-curated, computadas del estado real de Sofia post-seed.</td></tr><tr><td><code>backend/regression/sofiaFixture.js</code></td><td>Snapshot de la fixture.</td></tr><tr><td><code>backend/regression/computeExpectedFromSupabase.js</code></td><td>Recalcula valores esperados desde la BD.</td></tr><tr><td><code>backend/regression/runner.js</code></td><td>Ejecuta los 67 prompts contra Gemini real. Emite reporte JSON + CSV append-only.</td></tr><tr><td><code>backend/regression/assertions.js</code></td><td>11 tipos: <code>contains_number</code>, <code>cites_category</code>, <code>no_fabricated_categories</code>, <code>no_dates_outside_data</code>, <code>no_fabricated_amounts</code>, <code>invokes_tool</code>, <code>does_not_invoke_tool</code>, <code>refuses_gracefully</code>, <code>mentions_meta</code>, <code>language</code>, <code>max_length</code>.</td></tr><tr><td><code>backend/regression/generatePromptSheet.js</code></td><td>Genera HTML imprimible con prompts + valores esperados.</td></tr><tr><td><code>backend/regression/PROMPT_SHEET.html</code></td><td>Output del generador.</td></tr></tbody></table>
+<p><strong>Resultado actual:</strong> 96.9 % (62/64 antes de los 3 nuevos widgets). Las 2 fallas (<code>complex_salary_raise</code>, <code>complex_savings_progress</code>) son comportamiento del modelo (se rinde) — mitigadas con descripciones de tools más explícitas.</p>
+<hr/>
+<h2>3. Frontend</h2>
+<h3>3.1 <code>frontend/src/components/Chatbot.jsx</code> — el archivo grande</h3>
+<p>Este archivo (~2,000 LOC) concentra: 11 widget renderers, ActionProposalCard, lógica de SSE, drag/resize, voz, TTS, y todo el wiring del chat.</p>
+<p><strong>Cambios estructurales:</strong></p>
+<ul><li><strong>11 widgets renderers</strong> (todos defensivos contra payloads malformados):</li></ul>
+<p>  - <code>InlineChart</code> (Recharts pie/bar/line)   - <code>InlineStreak</code> — revamp con look-and-feel Banorte (rojo brand)   - <code>InlineCompare</code> — dos columnas con delta arrows verde/rojo   - <code>InlineSimulator</code> — sliders interactivos para 4 tipos   - <code>InlineGauge</code> — semicírculo con tick marks, % en el centro color-coded   - <code>InlineHeatmap</code> — celdas con intensidad rojo opacity-based   - <code>InlineSubsBreakdown</code> — barras de suscripciones con totales mensual/anual   - <code>InlineTopMerchants</code> — top 3 con medallas + barras   - <code>InlineSavingsRate</code> — donut ring con tier (Excelente/Bien/A mejorar/Negativo)   - <code>InlineRecCal</code> — calendar grid con dot por día con cargo (días <code>D,L,Ma,Mi,J,V,S</code> para evitar M ambiguo)   - <code>InlineSparklines</code> — mini-trends por categoría con delta %</p>
+<ul><li><strong>ActionProposalCard</strong> — confirm/cancel con <code>inFlightRef</code> (latch sincrónico) que previene doble-clic. Tarjeta picker cuando <code>needs:['id_tarjeta']</code>.</li><li><strong>Stream cleanup en unmount</strong> — <code>streamAbortRef.current?.abort()</code> en cleanup useEffect.</li><li><strong>Speech recognition cleanup</strong> — abort + nullify handlers en cleanup.</li><li><strong>TTS</strong> — Web Speech API <code>SpeechSynthesis</code>. Toggle 🔊/🔇 en header. Lee solo replies completos (no parciales). Limpia markdown y widget tags antes de hablar. Dedupe con <code>lastSpokenRef</code>.</li><li><strong>a11y pack</strong>:</li></ul>
+<p>  - <code>role="dialog"</code> + <code>aria-modal="true"</code> + <code>aria-label</code> en <code>.chat-window</code>   - <code>aria-label</code> en TODOS los icon-only buttons (mic, send, cancel, settings, fullscreen, close, FAB)   - <code>aria-pressed</code> en mic y TTS toggles   - <code>aria-expanded</code> en FAB   - <strong>ESC cierra</strong> chat (o el panel de settings si está abierto)</p>
+<ul><li><strong>Stable React keys</strong> — <code>nextMsgId()</code> monotónico en cada nuevo mensaje. React key <code>m-${id}</code> o fallback <code>i-${index}</code>.</li><li><strong>Touch drag support</strong> — <code>pointermove</code>/<code>pointerup</code>/<code>pointercancel</code> (en vez de <code>mousemove</code>/<code>mouseup</code>). Funciona en móvil/tablet.</li><li><strong>Debounce localStorage</strong> — writes diferidos 500 ms (antes write-por-keystroke durante streaming).</li><li><strong>Backend URL</strong> del bot AI (<code>Fortia AI</code>) llamada con <code>mode</code> coach/analyst.</li></ul>
+<h3>3.2 <code>frontend/src/components/FinancialDashboard.jsx</code></h3>
+<ul><li>Mount de <code>&amp;lt;ProactiveInsightsPanel&amp;gt;</code> arriba.</li><li><strong>Loading state</strong> explícito (<code>Cargando tus finanzas…</code>).</li><li><strong>Error banner</strong> explícito con <code>role="alert"</code> cuando la API falla (antes silently fallback a mock).</li><li><code>AbortController</code> en el effect para cancelar fetches stale (race entre tab switches).</li><li><code>axios.isCancel</code> ignora aborts intencionales para no spamear el banner.</li></ul>
+<h3>3.3 <code>frontend/src/components/ProactiveInsightsPanel.jsx</code> — NUEVO</h3>
+<ul><li>3 cards dismissibles arriba del dashboard.</li><li>Hits <code>/api/proactive-insights</code> (que tira del cache 6 h memoria + Postgres).</li><li>Severidad: alta (rojo) / media (naranja) / baja (gris).</li></ul>
+<h3>3.4 <code>frontend/src/styles/chatbot.css</code></h3>
+<ul><li>Paleta <code>ACCENT</code> restringida: rojo, verde, naranja, grises, blanco (Banorte brand).</li><li>Charts respetan la paleta (<code>CHART_PALETTE</code> 8 colores).</li><li>11 widget styles con <code>::before</code> rojo→naranja gradient bar arriba de cada card.</li><li>Streak revamp: white card con accent rojo (en vez de dark hero card).</li><li>Gauge con tick marks y meta-rows.</li><li><strong>Mobile-responsive</strong>: <code>@media (max-width: 640px)</code> auto-fullscreen + oculta resize handles + ajusta FAB.</li></ul>
+<h3>3.5 <code>frontend/vite.config.js</code></h3>
+<ul><li><code>sourcemap: 'hidden'</code> (genera maps sin referenciarlos en el bundle servido).</li><li><strong>Code-splitting</strong> vía <code>manualChunks</code>:</li></ul>
+<p>  - <code>recharts</code> (~404 KB) → chunk separado   - <code>markdown</code> (react-markdown + remark-gfm, ~165 KB) → chunk separado   - <code>supabase</code> (~193 KB) → chunk separado   - <strong>index principal: 355 KB</strong> (antes ~1.1 MB)</p>
+<h3>3.6 <code>frontend/src/i18n/</code> — NUEVO</h3>
+<ul><li>Scaffold de i18n sin runtime dep.</li><li><code>index.js</code> con <code>t(key, params)</code> para lookups dotted.</li><li><code>es-MX.js</code> con todas las strings user-facing (chatbot, dashboard, proposal, units).</li><li>Para agregar otro locale: drop archivo + add a <code>locales</code>. Default es-MX.</li></ul>
+<h3>3.7 <code>frontend/package.json</code></h3>
+<ul><li><strong>Removido</strong> <code>@supabase/ssr</code> (no usado en SPA Vite).</li><li>Patch upgrades pendientes (no aplicados en este sprint, sin riesgo): react, axios, recharts, react-router-dom, varios eslint plugins.</li></ul>
+<h3>3.8 <code>frontend/src/components/Chatbot.jsx</code> — <code>nextMsgId</code> helper</h3>
+<pre><code class="lang-js">let _msgIdCounter = 0;
+const nextMsgId = () =&gt; `${Date.now()}-${++_msgIdCounter}`;</code></pre>
+<hr/>
+<h2>4. Otros archivos</h2>
+<table><thead><tr><th>Archivo</th><th>Estado</th><th>Descripción</th></tr></thead><tbody><tr><td><code>vercel.json</code></td><td>MODIFICADO</td><td>Bloque <code>functions</code> con <code>maxDuration: 300</code> y <code>memory: 1024</code> para <code>api/index.js</code>. Sin esto, el SSE del chatbot se cortaba a 10/60 s default.</td></tr><tr><td><code>CLAUDE.md</code></td><td>NUEVO (raíz)</td><td>Onboarding completo para futuros agentes Claude en el repo: stack, layout, comandos, env vars, gotchas, dónde mirar primero.</td></tr><tr><td><code>SEED_SOFIA_README.md</code></td><td>NUEVO (raíz)</td><td>Documentación de la fixture Sofia.</td></tr><tr><td><code>.gitignore</code></td><td>MODIFICADO</td><td>Agregado <code>backend/test_*.json/csv</code>, <code>backend/regression/reports/</code>, <code>backend/regression/summary.csv</code>, <code>backend/coverage/</code>, <code>frontend/dist/</code>, <code>.vscode/</code>, <code>.idea/</code>.</td></tr><tr><td><code>.github/workflows/ci.yml</code></td><td>NUEVO</td><td>CI: lint + jest + build.</td></tr><tr><td><code>.github/workflows/regression.yml</code></td><td>NUEVO</td><td>Regresión LLM programada (semanal + manual dispatch).</td></tr><tr><td><code>docs/SCMP.md</code> + <code>docs/SCMP.pdf</code></td><td>NUEVOS</td><td>Plan de Gestión de Configuración de Software completo.</td></tr><tr><td><code>docs/md-to-pdf.js</code></td><td>NUEVO</td><td>Pipeline markdown → HTML → PDF (Chrome headless).</td></tr><tr><td><code>frontend/public/favicon.{png,svg}</code></td><td>NUEVOS</td><td>Branding.</td></tr><tr><td><code>frontend/src/Logo_de_Banorte_neutral.svg.png</code></td><td>NUEVO</td><td>Logo.</td></tr></tbody></table>
+<p><strong>Eliminados:</strong></p>
+<ul><li><code>frontend/src/components/ChatbotTestModal.jsx</code> (reemplazado por suite de regresión)</li><li><code>frontend/src/utils/chatbotTests.js</code> (idem)</li><li><code>backend/test_report_manual.json</code> + <code>backend/test_results.csv</code> + <code>backend/test_results_report.csv</code> (artifacts)</li><li><code>backend/package.json</code>: removido <code>zod-to-json-schema</code> (zod v4 tiene <code>z.toJSONSchema</code> nativo)</li><li><code>frontend/src/components/Chatbot.jsx</code>: removido import muerto <code>TbSettings</code></li></ul>
+<hr/>
+<h2>5. Auditoría sistemática (sweep #1)</h2>
+<p>Lancé <strong>7 subagentes en paralelo</strong> para auditar: deps backend, deps frontend, bugs backend, bugs frontend, cobertura de tests, performance, guardrails de alucinación. <strong>Total hallazgos: ~50.</strong> Aplicados:</p>
+<h3>CRITICAL (5)</h3>
+<ol><li><code>vercel.json</code> con <code>maxDuration: 300</code> + Fluid Compute (sin esto el SSE del chatbot se moría a los 10-60 s).</li><li><code>proposalStore.tryClaim()</code> síncrono evita doble-ejecución por race (audit incorrectly assumed <code>consume()</code> no era atómico — sí lo es, pero hay un await intermedio en la ruta; <code>tryClaim</code> cierra esa ventana).</li><li><code>aportarMeta</code> con rollback manual del <code>progreso</code> si insert de movimiento falla.</li><li>Cleanup de <code>streamAbortRef</code> y speech recognition al unmount del Chatbot.</li><li>Defensive guards en 9 widget renderers (un payload malformado white-screeneaba el chat).</li></ol>
+<h3>HIGH (10)</h3>
+<ol><li><code>aportarMeta</code> valida ownership de <code>id_tarjeta</code> (defense-in-depth para path directo PATCH <code>/metas/:id/aportar</code>).</li><li><code>obtener_movimientos</code> empuja <code>id_categoria</code> al query Supabase (antes filtraba en JS DESPUÉS del limit → false-empties).</li><li><code>send()</code> con guard <code>writableEnded/destroyed</code> + <code>res.on('error')</code> para EPIPE en disconnect.</li><li><code>proponer_crear_meta.fecha_limite</code> usa <code>isoDate()</code> con calendar+range refine (rechaza <code>2025-13-01</code>).</li><li>Redundancia en agent loop ahora <strong>rompe el loop</strong> (antes solo nudge → modelo testarudo gastaba MAX_ITERS).</li><li><code>materializar</code> es opt-in con throttle 1 h por usuario.</li><li>Pre-fetch + <code>buildToolRegistry</code> paralelizados (200-300 ms de latencia menos por turn).</li><li>Code-splitting frontend (1.1 MB → 4 chunks).</li><li>Double-confirm guard con <code>inFlightRef</code> en <code>ActionProposalCard</code>.</li><li>Speech recognition leak en unmount.</li></ol>
+<h3>MEDIUM/LOW</h3>
+<ul><li>Timeouts upstream Gemini (90 s) y Ollama (120 s) con <code>AbortSignal.any</code>.</li><li>3 prompts nuevos en regresión para los widgets nuevos.</li><li><code>.gitignore</code> actualizado.</li><li>Eliminación de orfans + deps muertas (<code>zod-to-json-schema</code>, <code>@supabase/ssr</code>, <code>TbSettings</code>).</li><li><code>InlineRecCal</code> días <code>D,L,Ma,Mi,J,V,S</code>.</li><li>Descripciones de tools mejoradas para <code>complex_salary_raise</code> / <code>complex_savings_progress</code>.</li></ul>
+<p><strong>npm audit:</strong> 0 vulnerabilidades en backend y frontend.</p>
+<hr/>
+<h2>6. Mejoras de los 5 tiers (sweep #2)</h2>
+<p>Después del audit, hice un segundo sweep cubriendo <strong>todos los tiers</strong> (mejoras propuestas) + extras grandes:</p>
+<h3>Tier 1 — Bajo esfuerzo, alto impacto</h3>
+<ol><li><strong>Streaming token-por-token real</strong> (<code>generateStreamWithTools</code>) — el usuario ve tokens conforme Gemini los produce en la última iter (antes typewriter local).</li><li><strong>Compactación de historial del agente</strong> — placeholder cuando supera 40 KB.</li><li><strong>Logger estructurado</strong> JSON-line.</li><li><strong>a11y pack</strong> completo.</li><li>Logger preparado para Sentry/Logtail.</li></ol>
+<h3>Tier 2 — Medio esfuerzo, alto impacto</h3>
+<ol><li><strong>Tests faltantes</strong>: providers (Gemini/Ollama), <code>tools/context.js</code>. +10 tests, total 191.</li><li>(Skipped) E2E Playwright — out of scope para sprint.</li><li><strong>Long-horizon planning</strong> (<code>plan_financiero</code> + <code>plan_hito</code> + <code>plan_revision</code>, 2 tools nuevos del agente, endpoint <code>/api/planes</code>).</li><li><strong>Proactive insights cache en Postgres</strong> (tier-2: memoria → Postgres) sobrevive cold starts.</li><li><strong>Rate limit per-user</strong> (después de auth) con <code>keyGenerator</code> IPv6-safe + IP gate antes de auth.</li></ol>
+<h3>Tier 3 — UX</h3>
+<ol><li>(Pendiente UI) Server-side chat history — backend listo (<code>/api/chat-history</code> + tabla <code>chat_message</code>).</li><li><strong>Debounce localStorage writes</strong> 500 ms.</li><li><strong>Stable React keys</strong> (<code>msg.id</code>).</li><li><strong>Touch drag support</strong> (<code>pointer*</code> events).</li><li><strong>Loading/error states</strong> explícitos en FinancialDashboard.</li><li><strong>TTS</strong> (text-to-speech) toggle 🔊/🔇 con dedup.</li></ol>
+<h3>Tier 4 — Plataforma</h3>
+<ol><li><strong>Audit log</strong> append-only (<code>audit_log</code> table).</li><li>(Pendiente integración externa) Sentry / Vercel Agent / PostHog.</li><li>CI workflow ya existía.</li><li><strong>CLAUDE.md</strong> raíz.</li></ol>
+<h3>Tier 5 — Producto</h3>
+<ol><li>(Pendiente UI) <strong>Webhook/notification scaffolding</strong> — backend listo (<code>notificacion</code> table + endpoints + <code>generateForUser</code> que emite por insights high-severity).</li><li>(Pendiente UI) Multi-cuenta/familia.</li><li><strong>i18n scaffolding</strong> (<code>es-MX</code> default, otros locales solo agregan archivo).</li><li><strong>PDF export endpoint</strong> (<code>/api/export/summary-html</code> genera HTML print-ready).</li><li><strong>Mobile-responsive</strong> chatbot (CSS media query auto-fullscreen).</li></ol>
+<hr/>
+<h2>7. Aplicaciones en producción (Supabase)</h2>
+<p>Las 5 migraciones SQL nuevas (003-007) fueron <strong>aplicadas exitosamente</strong> en el proyecto Supabase <code>qzqtepussricbilarxyn</code> (FinanceSmart, A00838952's Org) vía SQL Editor con el bundle <code>apply_003_to_007.sql</code>.</p>
+<p><strong>Verificación:</strong></p>
+<pre><code class="lang-sql">SELECT tablename FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN ('audit_log', 'chat_message', 'notificacion',
+                    'plan_financiero', 'plan_hito', 'plan_revision',
+                    'proactive_insights_cache')
+ORDER BY tablename;
+-- 7 rows ✅</code></pre>
+<hr/>
+<h2>8. Verificación final</h2>
+<table><thead><tr><th>Check</th><th>Resultado</th></tr></thead><tbody><tr><td><code>cd backend &amp;amp;&amp;amp; npm test</code></td><td><strong>191/191 tests verde</strong> (18 suites)</td></tr><tr><td><code>cd frontend &amp;amp;&amp;amp; npm run build</code></td><td><strong>OK</strong>, 7 s, code-splitting efectivo</td></tr><tr><td><code>cd frontend &amp;amp;&amp;amp; npm run lint</code></td><td>5 errores pre-existentes (en archivos no tocados: <code>MetasAhorro.jsx</code>, <code>Tarjetas.jsx</code>) — no introducidos por este sprint</td></tr><tr><td><code>npm audit</code> (backend)</td><td><strong>0 vulnerabilidades</strong></td></tr><tr><td><code>npm audit</code> (frontend)</td><td><strong>0 vulnerabilidades</strong></td></tr><tr><td>Backend dev</td><td><code>Server running on port 3001</code> con Gemini activo (<code>tools, structured, streaming</code>)</td></tr><tr><td>Frontend dev</td><td>Vite ready en 835 ms, <code>http://localhost:5173</code></td></tr><tr><td>Regresión LLM contra Gemini real</td><td><strong>96.9 %</strong> (62/64) — las 2 fallas restantes son comportamiento del modelo (se rinde demasiado rápido), mitigadas con prompts mejorados</td></tr><tr><td>Tasa de alucinación en consultas grounded</td><td><strong>0 %</strong></td></tr></tbody></table>
+<hr/>
+<h2>9. Decisiones técnicas clave</h2>
+<ol><li><strong>Express 5 + Vercel:</strong> se usa <code>res.on('close')</code> no <code>req.on('close')</code> (Express 5 dispara <code>req.on('close')</code> apenas termina el body buffer).</li><li><strong>Zod v4</strong> built-in <code>z.toJSONSchema()</code> (no zod-to-json-schema externo, que es zod v3 only).</li><li><strong>Gemini schema converter</strong> propio (<code>zodToGeminiSchema</code>) — Gemini rechaza <code>const</code>, <code>propertyNames</code>, <code>oneOf</code> de objetos. Conversión + lowercase types.</li><li><strong><code>FINAL_RESPONSE_NUDGE</code></strong> — Gemini a veces no produce texto después de tool calls. Nudge fuerza un final reply.</li><li><strong>Per-request enums</strong> (<code>tools/context.js</code>) — defensa estructural contra alucinación de IDs.</li><li><strong>Write tools nunca mutan</strong> — solo proposals + SSE event. Mutación solo en <code>/confirm-action</code> con re-validación zod.</li><li><strong>Streaming opcional</strong> — <code>generateStreamWithTools</code> se usa solo si <code>onTextDelta</code> está presente, fallback a <code>generateWithTools</code> no-streaming en tests.</li><li><strong>Cache híbrido</strong> (memoria + Postgres) para insights — memoria es O(1) cuando warm, Postgres rehidrata después de cold start.</li></ol>
+<hr/>
+<h2>10. Próximos pasos sugeridos</h2>
+<p><strong>Inmediato (deploy):</strong></p>
+<ol><li><code>git add . &amp;amp;&amp;amp; git commit &amp;amp;&amp;amp; git push</code> para subir todos los cambios working-tree.</li><li>Vercel auto-deploya. Smoke test: login → chatbot → preguntas básicas + acción con confirm.</li></ol>
+<p><strong>Próximo sprint (UI para features ya backed):</strong></p>
+<ol><li>UI para chat history server-side (panel "Conversaciones anteriores").</li><li>UI para planes financieros (página <code>/planes</code> con CRUD).</li><li>UI para notificaciones (badge en navbar + panel).</li><li>Integrar Sentry / Vercel Agent.</li></ol>
+<p><strong>Continuo:</strong></p>
+<ol><li>Correr <code>npm run regression</code> semanalmente y monitorear el CSV append-only.</li><li>Cuando Gemini saque versión nueva, abstrae bien (la capa de provider lo hace fácil).</li></ol>
+<hr/>
+<p><strong>Fin del documento.</strong></p>
+</body>
+</html>

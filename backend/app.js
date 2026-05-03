@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const finanzasRoutes = require('./routes/finanzas');
 const dashboardRoutes = require('./routes/dashboard');
 const inversionRoutes = require('./routes/inversion');
@@ -16,6 +16,11 @@ const healthRoutes = require('./routes/health');
 const configRoutes = require('./routes/config');
 const suscripcionesRoutes = require('./routes/suscripciones');
 const insightsRoutes = require('./routes/insights');
+const proactiveInsightsRoutes = require('./routes/proactiveInsights');
+const chatHistoryRoutes = require('./routes/chatHistory');
+const planesRoutes = require('./routes/planes');
+const exportRoutes = require('./routes/export');
+const notificacionesRoutes = require('./routes/notificaciones');
 const authMiddleware = require('./middleware/auth');
 require('dotenv').config();
 
@@ -37,12 +42,29 @@ const generalLimit = rateLimit({
   message: { error: 'Demasiadas solicitudes, intenta más tarde.' }
 });
 
-const chatbotLimit = rateLimit({
+// IP-based first-line gate (covers unauthenticated requests).
+const chatbotIpLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isDev,
+  message: { error: 'Demasiadas solicitudes, intenta más tarde.' }
+});
+
+// Per-user limit AFTER auth so a botnet of IPs can't burn one user's quota.
+// Falls back to IP if for any reason req.usuario isn't populated yet.
+const chatbotUserLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => isDev,
+  keyGenerator: (req, res) => {
+    if (req.usuario?.id_usuario) return `u:${req.usuario.id_usuario}`;
+    // IPv6-safe fallback (groups by /64 subnet so an attacker can't cycle within one).
+    return ipKeyGenerator(req, res);
+  },
   message: { error: 'Límite de mensajes alcanzado, espera un momento.' }
 });
 
@@ -62,10 +84,15 @@ app.use('/api/movimientos', authMiddleware, movimientosRoutes);
 app.use('/api/categorias', authMiddleware, categoriasRoutes);
 app.use('/api/presupuestos', authMiddleware, presupuestosRoutes);
 app.use('/api/recurrencias', authMiddleware, recurrenciasRoutes);
-app.use('/api/chatbot', chatbotLimit, authMiddleware, chatbotRoutes);
+app.use('/api/chatbot', chatbotIpLimit, authMiddleware, chatbotUserLimit, chatbotRoutes);
 app.use('/api/health', authMiddleware, healthRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/suscripciones', authMiddleware, suscripcionesRoutes);
 app.use('/api/insights', authMiddleware, insightsRoutes);
+app.use('/api/proactive-insights', authMiddleware, proactiveInsightsRoutes);
+app.use('/api/chat-history', authMiddleware, chatHistoryRoutes);
+app.use('/api/planes', authMiddleware, planesRoutes);
+app.use('/api/export', authMiddleware, exportRoutes);
+app.use('/api/notificaciones', authMiddleware, notificacionesRoutes);
 
 module.exports = app;
