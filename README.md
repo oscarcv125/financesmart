@@ -1,0 +1,3 @@
+# financesmart
+
+Automated README.
