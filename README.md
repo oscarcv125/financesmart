@@ -1,8 +1,14 @@
-# FinanceSmart (Express/Supabase)
+# FinanceSmart (Backend API)
 
-The backend and API infrastructure for the FinanceSmart application.
+The dedicated backend infrastructure and REST API for the FinanceSmart ecosystem.
 
-## Technologies
-- **Node.js & Express**: Robust REST API framework.
-- **Supabase**: Open-source Firebase alternative for authentication and PostgreSQL database management.
-- **Security**: Rate limiting (`express-rate-limit`) and CORS management included.
+## ⚙️ Backend Architecture
+
+### Server & Framework
+- **Node.js & Express**: A robust, scalable REST API built on Express.
+- **CORS & Security**: Configured with strict CORS policies for frontend communication.
+- **Rate Limiting**: Utilizes `express-rate-limit` to prevent brute-force attacks and ensure API stability.
+
+### Database & Authentication
+- **Supabase Integration**: Connects to Supabase (via `@supabase/supabase-js`) for a powerful, open-source PostgreSQL database.
+- **Environment Management**: Securely handles database URIs and authentication keys using `dotenv`.
